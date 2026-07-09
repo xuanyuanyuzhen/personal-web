@@ -1,0 +1,548 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum PublishStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum Visibility {
+  PUBLIC
+  PRIVATE
+}
+
+enum AuditStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum TargetType {
+  SITE
+  NAVIGATION
+  PAGE
+  THOUGHT
+  ESSAY
+  ESSAY_CATEGORY
+  PHOTO
+  ALBUM
+  MESSAGE
+  COMMENT
+  MUSIC
+  TAG
+  MASCOT
+  ANNOUNCEMENT
+  SETTING
+}
+
+enum NavigationType {
+  INTERNAL
+  EXTERNAL
+  PAGE
+}
+
+enum ForbiddenRuleType {
+  PLAIN
+  REGEX_RESERVED
+}
+
+enum BlacklistType {
+  NAME
+  EMAIL
+  IP
+  VISITOR_ID
+}
+
+enum OperationType {
+  LOGIN
+  LOGOUT
+  CREATE
+  UPDATE
+  DELETE
+  RESTORE
+  PERMANENT_DELETE
+  AUDIT
+  CHANGE_PASSWORD
+  UPDATE_SETTING
+}
+
+enum RecycleStatus {
+  ACTIVE
+  RESTORED
+  PURGED
+}
+
+model Admin {
+  id              Int       @id @default(autoincrement())
+  username        String    @unique @db.VarChar(64)
+  passwordHash    String    @db.VarChar(255)
+  passwordVersion Int       @default(1)
+  displayName     String    @default("Administrator") @db.VarChar(64)
+  lastLoginAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  operationLogs   OperationLog[]
+  deletedItems    RecycleBinItem[] @relation("RecycleDeletedBy")
+
+  @@map("admins")
+}
+
+model Navigation {
+  id        Int            @id @default(autoincrement())
+  key       String         @unique @db.VarChar(64)
+  title     String         @db.VarChar(80)
+  type      NavigationType @default(INTERNAL)
+  path      String?        @db.VarChar(255)
+  url       String?        @db.VarChar(500)
+  target    String?        @db.VarChar(32)
+  icon      String?        @db.VarChar(64)
+  parentId  Int?
+  pageId    Int?
+  sortOrder Int            @default(0)
+  isEnabled Boolean        @default(true)
+  deletedAt DateTime?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  parent   Navigation?  @relation("NavigationTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children Navigation[] @relation("NavigationTree")
+  page     CustomPage?  @relation(fields: [pageId], references: [id], onDelete: SetNull)
+
+  @@index([parentId, sortOrder])
+  @@index([isEnabled, sortOrder])
+  @@index([deletedAt])
+  @@map("navigations")
+}
+
+model CustomPage {
+  id             Int           @id @default(autoincrement())
+  title          String        @db.VarChar(160)
+  slug           String        @unique @db.VarChar(160)
+  summary        String?       @db.VarChar(500)
+  content        String        @db.LongText
+  status         PublishStatus @default(DRAFT)
+  visibility     Visibility    @default(PUBLIC)
+  seoTitle       String?       @db.VarChar(160)
+  seoDescription String?       @db.VarChar(500)
+  seoKeywords    String?       @db.VarChar(255)
+  isPinned       Boolean       @default(false)
+  sortOrder      Int           @default(0)
+  publishedAt    DateTime?
+  scheduledAt    DateTime?
+  deletedAt      DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  navigations Navigation[]
+
+  @@index([status, visibility, isPinned, sortOrder, createdAt])
+  @@index([deletedAt])
+  @@map("pages")
+}
+
+model Thought {
+  id          Int           @id @default(autoincrement())
+  content     String        @db.LongText
+  summary     String?       @db.VarChar(500)
+  imageUrl    String?       @db.VarChar(500)
+  mood        String?       @db.VarChar(64)
+  status      PublishStatus @default(DRAFT)
+  visibility  Visibility    @default(PUBLIC)
+  isPinned    Boolean       @default(false)
+  sortOrder   Int           @default(0)
+  publishedAt DateTime?
+  scheduledAt DateTime?
+  deletedAt   DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([status, visibility, isPinned, sortOrder, createdAt])
+  @@index([deletedAt])
+  @@map("thoughts")
+}
+
+model EssayCategory {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique @db.VarChar(80)
+  slug        String   @unique @db.VarChar(100)
+  description String?  @db.VarChar(500)
+  sortOrder   Int      @default(0)
+  isEnabled   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  essays Essay[]
+
+  @@index([isEnabled, sortOrder])
+  @@map("essay_categories")
+}
+
+model Essay {
+  id          Int            @id @default(autoincrement())
+  title       String         @db.VarChar(180)
+  slug        String         @unique @db.VarChar(180)
+  summary     String?        @db.VarChar(500)
+  content     String         @db.LongText
+  coverUrl    String?        @db.VarChar(500)
+  categoryId  Int?
+  status      PublishStatus  @default(DRAFT)
+  visibility  Visibility     @default(PUBLIC)
+  isPinned    Boolean        @default(false)
+  sortOrder   Int            @default(0)
+  publishedAt DateTime?
+  scheduledAt DateTime?
+  deletedAt   DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  category EssayCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  comments Comment[]
+
+  @@index([categoryId, status, visibility])
+  @@index([status, visibility, isPinned, sortOrder, createdAt])
+  @@index([deletedAt])
+  @@map("essays")
+}
+
+model Album {
+  id          Int           @id @default(autoincrement())
+  name        String        @unique @db.VarChar(100)
+  slug        String        @unique @db.VarChar(120)
+  description String?       @db.VarChar(500)
+  coverUrl    String?       @db.VarChar(500)
+  status      PublishStatus @default(PUBLISHED)
+  visibility  Visibility    @default(PUBLIC)
+  sortOrder   Int           @default(0)
+  isEnabled   Boolean       @default(true)
+  deletedAt   DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  photos Photo[]
+
+  @@index([status, visibility, isEnabled, sortOrder])
+  @@index([deletedAt])
+  @@map("albums")
+}
+
+model Photo {
+  id          Int           @id @default(autoincrement())
+  title       String        @db.VarChar(160)
+  description String?       @db.VarChar(500)
+  originalUrl String        @db.VarChar(500)
+  largeUrl    String?       @db.VarChar(500)
+  thumbUrl    String?       @db.VarChar(500)
+  albumId     Int?
+  status      PublishStatus @default(PUBLISHED)
+  visibility  Visibility    @default(PUBLIC)
+  sortOrder   Int           @default(0)
+  deletedAt   DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  album Album? @relation(fields: [albumId], references: [id], onDelete: SetNull)
+
+  @@index([albumId, status, visibility, sortOrder])
+  @@index([status, visibility, sortOrder, createdAt])
+  @@index([deletedAt])
+  @@map("photos")
+}
+
+model Message {
+  id               Int         @id @default(autoincrement())
+  nickname         String      @db.VarChar(80)
+  email            String      @db.VarChar(160)
+  content          String      @db.Text
+  avatarUrl        String?     @db.VarChar(500)
+  visitorId        String      @db.VarChar(128)
+  ipHash           String?     @db.VarChar(128)
+  ipMasked         String?     @db.VarChar(64)
+  browser          String?     @db.VarChar(64)
+  device           String?     @db.VarChar(64)
+  auditStatus      AuditStatus @default(PENDING)
+  hitWords         Json?
+  blacklistMatched Boolean     @default(false)
+  deletedAt        DateTime?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  @@index([auditStatus, createdAt])
+  @@index([visitorId, createdAt])
+  @@index([deletedAt])
+  @@map("messages")
+}
+
+model Comment {
+  id               Int         @id @default(autoincrement())
+  essayId          Int
+  parentId         Int?
+  nickname         String      @db.VarChar(80)
+  email            String      @db.VarChar(160)
+  content          String      @db.Text
+  visitorId        String      @db.VarChar(128)
+  ipHash           String?     @db.VarChar(128)
+  ipMasked         String?     @db.VarChar(64)
+  browser          String?     @db.VarChar(64)
+  device           String?     @db.VarChar(64)
+  auditStatus      AuditStatus @default(PENDING)
+  hitWords         Json?
+  blacklistMatched Boolean     @default(false)
+  deletedAt        DateTime?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  essay    Essay     @relation(fields: [essayId], references: [id], onDelete: Cascade)
+  parent   Comment?  @relation("CommentTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children Comment[] @relation("CommentTree")
+
+  @@index([essayId, auditStatus, createdAt])
+  @@index([parentId])
+  @@index([visitorId, createdAt])
+  @@index([deletedAt])
+  @@map("comments")
+}
+
+model Like {
+  id         Int        @id @default(autoincrement())
+  visitorId String     @db.VarChar(128)
+  targetType TargetType
+  targetId   String    @db.VarChar(64)
+  createdAt  DateTime  @default(now())
+
+  @@unique([visitorId, targetType, targetId])
+  @@index([targetType, targetId, createdAt])
+  @@index([createdAt])
+  @@map("likes")
+}
+
+model Tag {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique @db.VarChar(80)
+  slug      String   @unique @db.VarChar(100)
+  color     String?  @db.VarChar(32)
+  isEnabled Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  scopes    TagScope[]
+  relations TagRelation[]
+
+  @@index([isEnabled, name])
+  @@map("tags")
+}
+
+model TagScope {
+  id         Int        @id @default(autoincrement())
+  tagId      Int
+  targetType TargetType
+
+  tag Tag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([tagId, targetType])
+  @@index([targetType])
+  @@map("tag_scopes")
+}
+
+model TagRelation {
+  id         Int        @id @default(autoincrement())
+  tagId      Int
+  targetType TargetType
+  targetId   String     @db.VarChar(64)
+  createdAt  DateTime   @default(now())
+
+  tag Tag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([tagId, targetType, targetId])
+  @@index([targetType, targetId])
+  @@map("tag_relations")
+}
+
+model ForbiddenWord {
+  id        Int               @id @default(autoincrement())
+  word      String            @unique @db.VarChar(160)
+  ruleType  ForbiddenRuleType @default(PLAIN)
+  note      String?           @db.VarChar(500)
+  extension Json?
+  isEnabled Boolean           @default(true)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@index([isEnabled, ruleType])
+  @@map("forbidden_words")
+}
+
+model BlacklistItem {
+  id        Int           @id @default(autoincrement())
+  type      BlacklistType
+  value     String        @db.VarChar(255)
+  note      String?       @db.VarChar(500)
+  isEnabled Boolean       @default(true)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@unique([type, value])
+  @@index([isEnabled, type])
+  @@map("blacklist_items")
+}
+
+model AuditRecord {
+  id          Int         @id @default(autoincrement())
+  targetType  TargetType
+  targetId    String      @db.VarChar(64)
+  status      AuditStatus
+  reason      String?     @db.VarChar(500)
+  hitWords    Json?
+  reviewedBy  Int?
+  reviewedAt  DateTime?
+  createdAt   DateTime    @default(now())
+
+  @@index([targetType, targetId])
+  @@index([status, createdAt])
+  @@map("audit_records")
+}
+
+model Music {
+  id          Int      @id @default(autoincrement())
+  title       String   @db.VarChar(160)
+  artist      String   @db.VarChar(160)
+  localUrl    String?  @db.VarChar(500)
+  externalUrl String?  @db.VarChar(500)
+  lyricText   String?  @db.LongText
+  lyricFileUrl String? @db.VarChar(500)
+  sortOrder   Int      @default(0)
+  isEnabled   Boolean  @default(true)
+  deletedAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isEnabled, sortOrder])
+  @@index([deletedAt])
+  @@map("musics")
+}
+
+model Mascot {
+  id            Int      @id @default(autoincrement())
+  key           String   @unique @db.VarChar(64)
+  name          String   @db.VarChar(80)
+  imageUrl      String?  @db.VarChar(500)
+  displayScopes Json?
+  live2dConfig  Json?
+  isEnabled     Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  lines MascotLine[]
+
+  @@index([isEnabled])
+  @@map("mascots")
+}
+
+model MascotLine {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique @db.VarChar(80)
+  mascotId  Int?
+  pageKey   String   @default("*") @db.VarChar(80)
+  content   String   @db.VarChar(500)
+  weight    Int      @default(1)
+  isRandom  Boolean  @default(true)
+  isEnabled Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  mascot Mascot? @relation(fields: [mascotId], references: [id], onDelete: Cascade)
+
+  @@index([pageKey, isEnabled, weight])
+  @@map("mascot_lines")
+}
+
+model Setting {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique @db.VarChar(100)
+  group       String   @default("site") @db.VarChar(60)
+  value       Json
+  description String?  @db.VarChar(255)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([group])
+  @@map("settings")
+}
+
+model Announcement {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique @db.VarChar(64)
+  title       String   @db.VarChar(160)
+  content     String   @db.LongText
+  isEnabled   Boolean  @default(true)
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isEnabled, publishedAt])
+  @@map("announcements")
+}
+
+model VisitLog {
+  id        Int        @id @default(autoincrement())
+  pageType  TargetType
+  pageId    String?    @db.VarChar(64)
+  path      String     @db.VarChar(500)
+  ipHash    String?    @db.VarChar(128)
+  ipMasked  String?    @db.VarChar(64)
+  browser   String?    @db.VarChar(64)
+  device    String?    @db.VarChar(64)
+  visitDate DateTime   @db.Date
+  createdAt DateTime   @default(now())
+
+  @@index([visitDate])
+  @@index([pageType, pageId, visitDate])
+  @@index([createdAt])
+  @@map("visit_logs")
+}
+
+model OperationLog {
+  id         Int           @id @default(autoincrement())
+  adminId    Int?
+  action     OperationType
+  objectType TargetType?
+  objectId   String?       @db.VarChar(64)
+  ip         String?       @db.VarChar(64)
+  detail     Json?
+  createdAt  DateTime      @default(now())
+
+  admin Admin? @relation(fields: [adminId], references: [id], onDelete: SetNull)
+
+  @@index([adminId, createdAt])
+  @@index([action, createdAt])
+  @@index([objectType, objectId])
+  @@map("operation_logs")
+}
+
+model RecycleBinItem {
+  id          Int           @id @default(autoincrement())
+  objectType  TargetType
+  objectId    String        @db.VarChar(64)
+  title       String        @db.VarChar(180)
+  summary     String?       @db.VarChar(500)
+  snapshot    Json?
+  status      RecycleStatus @default(ACTIVE)
+  deletedById Int?
+  deletedAt   DateTime      @default(now())
+  restoredAt  DateTime?
+  purgedAt    DateTime?
+
+  deletedBy Admin? @relation("RecycleDeletedBy", fields: [deletedById], references: [id], onDelete: SetNull)
+
+  @@index([objectType, objectId])
+  @@index([status, deletedAt])
+  @@index([deletedById, deletedAt])
+  @@map("recycle_bin_items")
+}
