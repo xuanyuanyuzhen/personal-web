@@ -57,6 +57,16 @@ pnpm --filter @yuer/api prisma:seed
 
 Seed 会初始化默认管理员、站点配置、导航、公告和看板娘占位配置。
 
+如果 `prisma:migrate` 报 `P3014`，说明当前 MySQL 用户不能创建 Prisma 迁移所需的 shadow database。可用 MySQL root 登录后，为本地开发用户补充权限：
+
+```sql
+GRANT CREATE, ALTER, DROP, REFERENCES ON *.* TO 'yuer'@'127.0.0.1';
+GRANT ALL PRIVILEGES ON yuer.* TO 'yuer'@'127.0.0.1';
+FLUSH PRIVILEGES;
+```
+
+然后重新执行 `prisma:migrate`，成功后再执行 `prisma:seed`。如果 `prisma:seed` 报 `admins` 表不存在，通常就是迁移尚未成功执行。
+
 默认管理员：
 
 - 账号：`admin`
