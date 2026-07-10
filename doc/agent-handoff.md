@@ -53,6 +53,8 @@ PUBLIC_UPLOAD_BASE_URL=/uploads
 
 ## 数据库初始化注意事项
 
+详细排错步骤见 `doc/local-prisma-troubleshooting.md`。
+
 Prisma Migrate 在 `migrate dev` 时需要创建 shadow database。若 MySQL 用户没有创建数据库权限，会报：
 
 ```text

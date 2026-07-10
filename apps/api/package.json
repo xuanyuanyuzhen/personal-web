@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "ts-node --project tsconfig.json src/main.ts",
+    "dev": "dotenv -e ../../.env -e ../../.env.example -- ts-node --project tsconfig.json src/main.ts",
     "build": "tsc -p tsconfig.build.json",
-    "start": "node dist/main.js",
+    "start": "dotenv -e ../../.env -e ../../.env.example -- node dist/main.js",
     "test": "jest --config jest.config.cjs",
     "prisma:validate": "dotenv -e ../../.env -e ../../.env.example -- prisma validate --schema prisma/schema.prisma",
     "prisma:generate": "dotenv -e ../../.env -e ../../.env.example -- prisma generate --schema prisma/schema.prisma",
