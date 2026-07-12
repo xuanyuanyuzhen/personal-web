@@ -131,7 +131,7 @@ function createPageFlipOverlay(source: HTMLElement, direction: PageFlipDirection
   overlay.style.width = `${sourceRect.width}px`;
   overlay.style.height = `${overlayHeight}px`;
   overlay.style.setProperty('--book-copy-width', `${sourceRect.width}px`);
-  overlay.style.setProperty('--book-cover-inset', `${pageInset}px`);
+  overlay.style.setProperty('--book-cover-top', `${headerBottom}px`);
 
   const targetLayer = document.createElement('div');
   const stage = document.createElement('div');

@@ -7,7 +7,6 @@
   --book-cover: #6b4436;
   --book-cover-dark: #40271f;
   --book-cover-light: #946b55;
-  --book-page-edge: rgb(117 76 58 / 22%);
   --card: rgb(255 255 255 / 76%);
   --ink: #402f36;
   --muted: #715a64;
@@ -46,7 +45,6 @@
   --book-cover: #4c3028;
   --book-cover-dark: #241714;
   --book-cover-light: #765246;
-  --book-page-edge: rgb(10 6 5 / 42%);
   --card: rgb(54 40 55 / 78%);
   --ink: #f7e7ed;
   --muted: #cfb8c2;
@@ -349,7 +347,8 @@ a {
   z-index: 1;
 }
 
-.book-flip-overlay::before {
+.book-flip-overlay::before,
+.book-flip-overlay::after {
   background:
     repeating-linear-gradient(
       112deg,
@@ -366,18 +365,27 @@ a {
       var(--book-cover) 91%,
       var(--book-cover-dark)
     );
-  border: 1px solid color-mix(in srgb, var(--book-cover-dark) 82%, black);
-  border-radius: 12px 12px 8px 8px;
-  box-shadow:
-    inset 0 0 0 1px rgb(255 255 255 / 8%),
-    inset 10px 0 16px rgb(255 255 255 / 4%),
-    inset -10px 0 16px rgb(10 4 3 / 16%),
-    0 16px 34px rgb(52 29 22 / 28%);
+  bottom: 0;
   content: '';
-  inset: calc(var(--book-cover-inset) * -1) -24px;
   pointer-events: none;
-  position: absolute;
+  position: fixed;
+  top: var(--book-cover-top);
+  width: clamp(56px, 5vw, 96px);
   z-index: 0;
+}
+
+.book-flip-overlay::before {
+  box-shadow:
+    inset -12px 0 20px rgb(20 9 6 / 22%),
+    10px 0 24px rgb(52 29 22 / 12%);
+  left: 0;
+}
+
+.book-flip-overlay::after {
+  box-shadow:
+    inset 12px 0 20px rgb(20 9 6 / 22%),
+    -10px 0 24px rgb(52 29 22 / 12%);
+  right: 0;
 }
 
 .book-flip-overlay.is-ready {
@@ -395,9 +403,6 @@ a {
 
 .book-flip-target {
   background: var(--paper-background);
-  box-shadow:
-    inset 0 0 0 1px var(--book-page-edge),
-    0 0 0 5px color-mix(in srgb, var(--bg-soft) 88%, var(--book-cover-light));
   inset: 0;
   overflow: hidden;
   position: absolute;
@@ -639,9 +644,9 @@ a {
   display: none;
 }
 
-.book-flip-overlay.is-mobile::before {
-  border-radius: 8px;
-  inset: calc(var(--book-cover-inset) * -1) -8px;
+.book-flip-overlay.is-mobile::before,
+.book-flip-overlay.is-mobile::after {
+  width: 8px;
 }
 
 .book-flip-overlay.is-mobile .book-flip-sheet,
