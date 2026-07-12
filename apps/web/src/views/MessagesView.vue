@@ -50,7 +50,10 @@ async function loadMore() {
     const result = await publicApi.listMessages({ page: page.value, pageSize });
     // 滚动加载可能和手动刷新交错，按 id 去重可以避免重复渲染同一条留言。
     const seen = new Set(messages.value.map((message) => message.id));
-    messages.value = [...messages.value, ...result.items.filter((message) => !seen.has(message.id))];
+    messages.value = [
+      ...messages.value,
+      ...result.items.filter((message) => !seen.has(message.id)),
+    ];
     total.value = result.pagination.total;
     page.value += 1;
   } catch {
@@ -67,11 +70,14 @@ function setupAutoLoad() {
 
   // 支持 IntersectionObserver 时自动触底加载；老环境保留“加载更多”按钮回退。
   supportsAutoLoad.value = true;
-  loadMoreObserver = new IntersectionObserver((entries) => {
-    if (entries.some((entry) => entry.isIntersecting)) {
-      void loadMore();
-    }
-  }, { rootMargin: '240px 0px' });
+  loadMoreObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        void loadMore();
+      }
+    },
+    { rootMargin: '240px 0px' },
+  );
   loadMoreObserver.observe(loadMoreSentinel.value);
 }
 
@@ -113,6 +119,7 @@ function avatarText(message: PublicMessage) {
   <section
     class="messages-page"
     aria-labelledby="messages-title"
+    :aria-busy="isLoading"
   >
     <p class="page-placeholder-eyebrow">
       {{ t('nav.messages') }}

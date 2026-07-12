@@ -1,6 +1,8 @@
 type PageFlipDirection = 'backward' | 'forward';
 
-const pageFlipDuration = 1100;
+const pageFlipDuration = 980;
+const pageSnapshotQuietPeriod = 120;
+const pageSnapshotMaxWait = 900;
 
 const pageOrder: Record<string, number> = {
   home: 0,
@@ -61,22 +63,33 @@ export function startRoutePageFlip(fromRoute: unknown, toRoute: unknown) {
   pageFlipTimer = window.setTimeout(stopPageFlip, pageFlipDuration + 1000);
 }
 
-export function finishRoutePageFlip() {
+export async function finishRoutePageFlip(options: { waitForContent?: boolean } = {}) {
   if (!pageFlipOverlay || typeof document === 'undefined') {
     return;
   }
 
+  const overlay = pageFlipOverlay;
   const target = document.querySelector<HTMLElement>('.route-page');
-  const back = pageFlipOverlay.querySelector<HTMLElement>('.book-flip-back');
+  const targetLayer = overlay.querySelector<HTMLElement>('.book-flip-target');
+  const back = overlay.querySelector<HTMLElement>('.book-flip-back');
 
-  if (!target || !back) {
+  if (!target || !targetLayer || !back) {
     stopPageFlip();
     return;
   }
 
-  back.replaceChildren(createPageCopy(target, 'book-flip-back-copy', pageFlipOverlay));
-  pageFlipOverlay.getBoundingClientRect();
-  pageFlipOverlay.classList.add('is-ready');
+  if (options.waitForContent !== false) {
+    await waitForPageSnapshot(target);
+  }
+
+  if (pageFlipOverlay !== overlay || !target.isConnected) {
+    return;
+  }
+
+  targetLayer.replaceChildren(createPageCopy(target, 'book-flip-target-copy', overlay));
+  back.replaceChildren(createPageCopy(target, 'book-flip-back-copy', overlay));
+  overlay.getBoundingClientRect();
+  overlay.classList.add('is-ready');
 
   if (pageFlipTimer) {
     window.clearTimeout(pageFlipTimer);
@@ -104,9 +117,10 @@ function createPageFlipOverlay(source: HTMLElement, direction: PageFlipDirection
   const sourceRect = source.getBoundingClientRect();
   const headerBottom =
     document.querySelector<HTMLElement>('.site-header')?.getBoundingClientRect().bottom ?? 0;
-  const overlayTop = Math.max(0, headerBottom);
-  const overlayHeight = Math.max(1, window.innerHeight - overlayTop);
   const isMobile = window.matchMedia?.('(max-width: 720px)').matches ?? false;
+  const pageInset = isMobile ? 8 : 18;
+  const overlayTop = Math.max(0, headerBottom + pageInset);
+  const overlayHeight = Math.max(1, window.innerHeight - overlayTop - pageInset);
   const overlay = document.createElement('div');
 
   overlay.className = `book-flip-overlay is-${direction}${isMobile ? ' is-mobile' : ''}`;
@@ -117,7 +131,10 @@ function createPageFlipOverlay(source: HTMLElement, direction: PageFlipDirection
   overlay.style.width = `${sourceRect.width}px`;
   overlay.style.height = `${overlayHeight}px`;
   overlay.style.setProperty('--book-copy-width', `${sourceRect.width}px`);
+  overlay.style.setProperty('--book-cover-inset', `${pageInset}px`);
 
+  const targetLayer = document.createElement('div');
+  const stage = document.createElement('div');
   const staticHalf = document.createElement('div');
   const underShadow = document.createElement('div');
   const sheet = document.createElement('div');
@@ -125,6 +142,8 @@ function createPageFlipOverlay(source: HTMLElement, direction: PageFlipDirection
   const back = document.createElement('div');
   const spine = document.createElement('div');
 
+  stage.className = 'book-flip-stage';
+  targetLayer.className = 'book-flip-target';
   staticHalf.className = 'book-flip-static';
   underShadow.className = 'book-flip-under-shadow';
   sheet.className = 'book-flip-sheet';
@@ -135,7 +154,8 @@ function createPageFlipOverlay(source: HTMLElement, direction: PageFlipDirection
   staticHalf.append(createPageCopy(source, 'book-flip-static-copy', overlay));
   front.append(createPageCopy(source, 'book-flip-front-copy', overlay));
   sheet.append(front, back);
-  overlay.append(staticHalf, underShadow, sheet, spine);
+  stage.append(targetLayer, staticHalf, underShadow, sheet, spine);
+  overlay.append(stage);
 
   return overlay;
 }
@@ -156,6 +176,62 @@ function createPageCopy(source: HTMLElement, className: string, overlay: HTMLEle
   copy.style.setProperty('--book-paper-y', `${-(window.scrollY + sourceRect.top)}px`);
 
   return copy;
+}
+
+function waitForPageSnapshot(target: HTMLElement) {
+  return new Promise<void>((resolve) => {
+    let quietTimer: number | undefined;
+    let pollTimer: number | undefined;
+    let settled = false;
+
+    const observer = new MutationObserver(scheduleCheck);
+    const maxTimer = window.setTimeout(complete, pageSnapshotMaxWait);
+
+    function complete() {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      observer.disconnect();
+      window.clearTimeout(maxTimer);
+      if (quietTimer) {
+        window.clearTimeout(quietTimer);
+      }
+      if (pollTimer) {
+        window.clearTimeout(pollTimer);
+      }
+      resolve();
+    }
+
+    function scheduleCheck() {
+      if (quietTimer) {
+        window.clearTimeout(quietTimer);
+      }
+      if (pollTimer) {
+        window.clearTimeout(pollTimer);
+      }
+
+      const pageBusy = Boolean(target.querySelector('[aria-busy="true"]'));
+      const imagePending = Array.from(target.querySelectorAll('img')).some(
+        (image) => !image.complete,
+      );
+
+      if (pageBusy || imagePending) {
+        pollTimer = window.setTimeout(scheduleCheck, 60);
+        return;
+      }
+
+      quietTimer = window.setTimeout(complete, pageSnapshotQuietPeriod);
+    }
+
+    observer.observe(target, {
+      attributes: true,
+      childList: true,
+      subtree: true,
+    });
+    scheduleCheck();
+  });
 }
 
 function resolvePageOrder(name: unknown): number | null {

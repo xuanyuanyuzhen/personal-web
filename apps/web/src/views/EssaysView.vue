@@ -84,7 +84,8 @@ async function toggleLike(item: PublicEssay) {
 }
 
 function handleScroll() {
-  const distanceToBottom = document.documentElement.scrollHeight - window.scrollY - window.innerHeight;
+  const distanceToBottom =
+    document.documentElement.scrollHeight - window.scrollY - window.innerHeight;
 
   if (distanceToBottom < 260 && hasMore.value) {
     void loadMore();
@@ -96,6 +97,7 @@ function handleScroll() {
   <section
     class="essays-page"
     aria-labelledby="essays-title"
+    :aria-busy="isLoading"
   >
     <p class="page-placeholder-eyebrow">
       {{ t('nav.essays') }}

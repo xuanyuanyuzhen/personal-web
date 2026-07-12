@@ -5,12 +5,15 @@ import { publicApi, type SiteSettings } from '../services/api';
 
 const { t } = useI18n();
 const settings = ref<SiteSettings | null>(null);
+const isLoading = ref(true);
 
 onMounted(async () => {
   try {
     settings.value = await publicApi.getSiteSettings();
   } catch {
     settings.value = null;
+  } finally {
+    isLoading.value = false;
   }
 });
 </script>
@@ -19,6 +22,7 @@ onMounted(async () => {
   <section
     class="about-page"
     aria-labelledby="about-title"
+    :aria-busy="isLoading"
   >
     <div class="about-profile">
       <div

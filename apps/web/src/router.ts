@@ -79,5 +79,5 @@ router.beforeEach((to, from) => {
 router.afterEach(async () => {
   setGlobalLoading(false);
   await nextTick();
-  finishRoutePageFlip();
+  await finishRoutePageFlip();
 });

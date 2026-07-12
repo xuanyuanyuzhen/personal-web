@@ -83,7 +83,8 @@ async function toggleLike(item: PublicThought) {
 }
 
 function handleScroll() {
-  const distanceToBottom = document.documentElement.scrollHeight - window.scrollY - window.innerHeight;
+  const distanceToBottom =
+    document.documentElement.scrollHeight - window.scrollY - window.innerHeight;
 
   if (distanceToBottom < 240 && hasMore.value) {
     void loadMore();
@@ -95,6 +96,7 @@ function handleScroll() {
   <section
     class="thoughts-page"
     aria-labelledby="thoughts-title"
+    :aria-busy="isLoading"
   >
     <p class="page-placeholder-eyebrow">
       {{ t('nav.thoughts') }}

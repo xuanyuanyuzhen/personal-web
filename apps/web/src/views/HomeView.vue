@@ -10,6 +10,7 @@ const ANNOUNCEMENT_DISMISSED_KEY = 'yuer.home.announcement.dismissed';
 
 const settings = ref<SiteSettings | null>(null);
 const announcement = ref<PublicAnnouncement | null>(null);
+const isLoading = ref(true);
 const announcementDismissed = ref(localStorage.getItem(ANNOUNCEMENT_DISMISSED_KEY) === '1');
 const siteLike = ref({
   likeCount: 0,
@@ -20,7 +21,9 @@ const likeBusy = ref(false);
 const siteName = computed(() => settings.value?.siteName || t('home.title'));
 const publicName = computed(() => settings.value?.publicName || t('home.kicker'));
 const homeIntroduction = computed(() => settings.value?.homeIntroduction || t('home.intro'));
-const showAnnouncement = computed(() => Boolean(announcement.value && !announcementDismissed.value));
+const showAnnouncement = computed(() =>
+  Boolean(announcement.value && !announcementDismissed.value),
+);
 
 onMounted(() => {
   void loadHomeData();
@@ -32,22 +35,26 @@ onBeforeUnmount(() => {
 });
 
 async function loadHomeData() {
-  const [nextSettings, nextAnnouncement, nextSiteLike] = await Promise.allSettled([
-    publicApi.getSiteSettings(),
-    publicApi.getAnnouncement(),
-    publicApi.getSiteLikeStatus(),
-  ]);
+  try {
+    const [nextSettings, nextAnnouncement, nextSiteLike] = await Promise.allSettled([
+      publicApi.getSiteSettings(),
+      publicApi.getAnnouncement(),
+      publicApi.getSiteLikeStatus(),
+    ]);
 
-  if (nextSettings.status === 'fulfilled') {
-    settings.value = nextSettings.value;
-  }
+    if (nextSettings.status === 'fulfilled') {
+      settings.value = nextSettings.value;
+    }
 
-  if (nextAnnouncement.status === 'fulfilled') {
-    announcement.value = nextAnnouncement.value;
-  }
+    if (nextAnnouncement.status === 'fulfilled') {
+      announcement.value = nextAnnouncement.value;
+    }
 
-  if (nextSiteLike.status === 'fulfilled') {
-    siteLike.value = nextSiteLike.value;
+    if (nextSiteLike.status === 'fulfilled') {
+      siteLike.value = nextSiteLike.value;
+    }
+  } finally {
+    isLoading.value = false;
   }
 }
 
@@ -79,6 +86,7 @@ async function toggleSiteLike() {
   <section
     class="home-view"
     aria-labelledby="home-title"
+    :aria-busy="isLoading"
   >
     <div class="intro">
       <p class="eyebrow">

@@ -29,7 +29,7 @@ describe('route page flip', () => {
     document.body.innerHTML = '';
   });
 
-  it('uses the current page on the front and the target page on the back', () => {
+  it('uses the current page on the front and a frozen target page on the back', async () => {
     startRoutePageFlip({ name: 'home', path: '/' }, { name: 'thoughts', path: '/thoughts' });
 
     const overlay = document.querySelector('.book-flip-overlay');
@@ -40,31 +40,59 @@ describe('route page flip', () => {
     expect(overlay?.querySelector('.book-flip-front-copy')?.textContent).toContain('Current page');
 
     document.querySelector('.route-page')!.innerHTML = '<h1>Target page</h1>';
-    finishRoutePageFlip();
+    await finishRoutePageFlip({ waitForContent: false });
 
     expect(overlay?.classList.contains('is-ready')).toBe(true);
     expect(overlay?.querySelector('.book-flip-back-copy')?.textContent).toContain('Target page');
     expect(overlay?.querySelector('.book-flip-back-copy')?.textContent).not.toContain(
       'Current page',
     );
-    expect(document.documentElement.style.getPropertyValue('--page-flip-duration')).toBe('1100ms');
+    expect(overlay?.querySelector('.book-flip-target-copy')?.textContent).toContain('Target page');
+
+    document.querySelector('.route-page')!.innerHTML = '<h1>Changed after snapshot</h1>';
+
+    expect(overlay?.querySelector('.book-flip-target-copy')?.textContent).not.toContain(
+      'Changed after snapshot',
+    );
+    expect(document.documentElement.style.getPropertyValue('--page-flip-duration')).toBe('980ms');
 
     vi.advanceTimersByTime(1260);
 
     expect(document.querySelector('.book-flip-overlay')).toBeNull();
   });
 
-  it('places the target half correctly when turning backward', () => {
+  it('places the target half correctly when turning backward', async () => {
     startRoutePageFlip(
       { name: 'photos', path: '/photos' },
       { name: 'thoughts', path: '/thoughts' },
     );
     document.querySelector('.route-page')!.innerHTML = '<h1>Previous page</h1>';
-    finishRoutePageFlip();
+    await finishRoutePageFlip({ waitForContent: false });
 
     const overlay = document.querySelector('.book-flip-overlay');
 
     expect(overlay?.classList.contains('is-backward')).toBe(true);
     expect(overlay?.querySelector('.book-flip-back-copy')?.textContent).toContain('Previous page');
+  });
+
+  it('waits for target content to finish loading before taking the snapshot', async () => {
+    startRoutePageFlip({ name: 'home', path: '/' }, { name: 'thoughts', path: '/thoughts' });
+    document.querySelector('.route-page')!.innerHTML =
+      '<section aria-busy="true"><h1>Loading page</h1></section>';
+
+    const finishPromise = finishRoutePageFlip();
+
+    await vi.advanceTimersByTimeAsync(240);
+    expect(document.querySelector('.book-flip-overlay')?.classList.contains('is-ready')).toBe(
+      false,
+    );
+
+    const target = document.querySelector('.route-page section')!;
+    target.setAttribute('aria-busy', 'false');
+    target.innerHTML = '<h1>Loaded page</h1>';
+    await vi.advanceTimersByTimeAsync(140);
+    await finishPromise;
+
+    expect(document.querySelector('.book-flip-target-copy')?.textContent).toContain('Loaded page');
   });
 });
