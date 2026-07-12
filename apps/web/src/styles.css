@@ -8,13 +8,26 @@
   --ink: #402f36;
   --muted: #715a64;
   --paper-line: rgb(196 91 128 / 12%);
+  --page-flip-crease: rgb(64 47 54 / 24%);
+  --page-flip-highlight: rgb(255 255 255 / 58%);
+  --page-flip-shadow: rgb(64 47 54 / 28%);
+  --paper-background:
+    linear-gradient(var(--paper-line) 1px, transparent 1px) 0 0 / 100% 32px,
+    linear-gradient(
+        90deg,
+        rgb(255 255 255 / 0%) 0,
+        rgb(255 255 255 / 0%) 96px,
+        var(--paper-line) 97px,
+        transparent 98px
+      )
+      0 0,
+    linear-gradient(180deg, var(--bg) 0%, var(--bg-soft) 100%);
   --shadow: 0 20px 50px rgb(142 86 112 / 14%);
   --surface: #fff;
 
   background: var(--bg);
   color: var(--ink);
-  font-family:
-    "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Segoe UI", sans-serif;
+  font-family: 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', 'Segoe UI', sans-serif;
   transition:
     background-color 220ms ease,
     color 220ms ease;
@@ -30,6 +43,9 @@
   --ink: #f7e7ed;
   --muted: #cfb8c2;
   --paper-line: rgb(229 161 184 / 14%);
+  --page-flip-crease: rgb(12 8 12 / 42%);
+  --page-flip-highlight: rgb(255 226 236 / 20%);
+  --page-flip-shadow: rgb(5 3 5 / 48%);
   --shadow: 0 18px 48px rgb(12 8 12 / 28%);
   --surface: #352736;
 
@@ -66,16 +82,7 @@ a {
 }
 
 .site-shell {
-  background:
-    linear-gradient(var(--paper-line) 1px, transparent 1px) 0 0 / 100% 32px,
-    linear-gradient(
-      90deg,
-      rgb(255 255 255 / 0%) 0,
-      rgb(255 255 255 / 0%) 96px,
-      var(--paper-line) 97px,
-      transparent 98px
-    ),
-    linear-gradient(180deg, var(--bg) 0%, var(--bg-soft) 100%);
+  background: var(--paper-background);
   color: var(--ink);
   min-height: 100vh;
 }
@@ -306,7 +313,246 @@ a {
 .site-main {
   margin: 0 auto;
   max-width: 1120px;
+  min-height: calc(100vh - 96px);
   padding: 0 24px 56px;
+  position: relative;
+}
+
+.route-page {
+  display: flow-root;
+  min-height: inherit;
+  position: relative;
+}
+
+.book-flip-overlay {
+  contain: layout paint;
+  isolation: isolate;
+  overflow: hidden;
+  perspective: 2200px;
+  pointer-events: none;
+  position: fixed;
+  transform-style: preserve-3d;
+  z-index: 18;
+}
+
+.book-flip-overlay.is-ready {
+  animation: book-overlay-release var(--page-flip-duration, 1100ms) linear both;
+}
+
+.book-flip-static,
+.book-flip-sheet,
+.book-flip-under-shadow {
+  bottom: 0;
+  position: absolute;
+  top: 0;
+  width: 50%;
+}
+
+.book-flip-static,
+.book-flip-under-shadow {
+  overflow: hidden;
+}
+
+.book-flip-static {
+  background: transparent;
+  z-index: 2;
+}
+
+.book-flip-static::after {
+  background: linear-gradient(
+    90deg,
+    transparent 72%,
+    rgb(64 47 54 / 4%) 86%,
+    var(--page-flip-shadow) 100%
+  );
+  content: '';
+  inset: 0;
+  opacity: 0.62;
+  pointer-events: none;
+  position: absolute;
+}
+
+.book-flip-sheet {
+  overflow: visible;
+  transform-style: preserve-3d;
+  z-index: 4;
+}
+
+.book-flip-face {
+  backface-visibility: hidden;
+  background: transparent;
+  inset: 0;
+  overflow: hidden;
+  position: absolute;
+  transform-style: preserve-3d;
+}
+
+.book-flip-face::after {
+  content: '';
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+}
+
+.book-flip-front {
+  transform: rotateY(0.01deg);
+}
+
+.book-flip-front::after {
+  background: linear-gradient(
+    90deg,
+    rgb(255 255 255 / 0%) 0%,
+    var(--page-flip-highlight) 58%,
+    rgb(255 255 255 / 8%) 74%,
+    var(--page-flip-shadow) 100%
+  );
+  mix-blend-mode: soft-light;
+}
+
+.book-flip-back {
+  transform: rotateY(180deg);
+}
+
+.book-flip-back::after {
+  background: linear-gradient(
+    90deg,
+    var(--page-flip-shadow) 0%,
+    rgb(64 47 54 / 7%) 22%,
+    var(--page-flip-highlight) 76%,
+    rgb(255 255 255 / 0%) 100%
+  );
+}
+
+.book-flip-copy {
+  background: var(--paper-background);
+  background-position:
+    var(--book-paper-x) var(--book-paper-y),
+    var(--book-paper-x) var(--book-paper-y),
+    var(--book-paper-x) var(--book-paper-y);
+  left: 0;
+  margin: 0;
+  max-width: none;
+  min-height: 100%;
+  position: absolute;
+}
+
+.book-flip-back-copy {
+  opacity: 1;
+}
+
+.book-flip-spine {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--page-flip-shadow) 34%,
+    var(--page-flip-crease) 49%,
+    var(--page-flip-highlight) 58%,
+    transparent
+  );
+  bottom: 0;
+  filter: blur(0.2px);
+  left: calc(50% - 10px);
+  position: absolute;
+  top: 0;
+  width: 20px;
+  z-index: 7;
+}
+
+.book-flip-under-shadow {
+  background: linear-gradient(90deg, var(--page-flip-shadow), transparent 34%);
+  z-index: 1;
+}
+
+.book-flip-overlay.is-forward .book-flip-static {
+  left: 0;
+}
+
+.book-flip-overlay.is-forward .book-flip-sheet,
+.book-flip-overlay.is-forward .book-flip-under-shadow {
+  left: 50%;
+}
+
+.book-flip-overlay.is-forward .book-flip-sheet {
+  animation: book-sheet-forward var(--page-flip-duration, 1100ms) cubic-bezier(0.42, 0.02, 0.18, 1)
+    both;
+  animation-play-state: paused;
+  transform-origin: left center;
+}
+
+.book-flip-overlay.is-forward .book-flip-front-copy {
+  left: -100%;
+}
+
+.book-flip-overlay.is-backward .book-flip-static {
+  left: 50%;
+}
+
+.book-flip-overlay.is-backward .book-flip-static::after {
+  transform: scaleX(-1);
+}
+
+.book-flip-overlay.is-backward .book-flip-static-copy {
+  left: -100%;
+}
+
+.book-flip-overlay.is-backward .book-flip-sheet,
+.book-flip-overlay.is-backward .book-flip-under-shadow {
+  left: 0;
+}
+
+.book-flip-overlay.is-backward .book-flip-sheet {
+  animation: book-sheet-backward var(--page-flip-duration, 1100ms) cubic-bezier(0.42, 0.02, 0.18, 1)
+    both;
+  animation-play-state: paused;
+  transform-origin: right center;
+}
+
+.book-flip-overlay.is-backward .book-flip-back-copy {
+  left: -100%;
+}
+
+.book-flip-overlay.is-ready .book-flip-front::after {
+  animation: book-front-shading var(--page-flip-duration, 1100ms) cubic-bezier(0.42, 0.02, 0.18, 1)
+    both;
+}
+
+.book-flip-overlay.is-ready .book-flip-back::after {
+  animation: book-back-shading var(--page-flip-duration, 1100ms) cubic-bezier(0.42, 0.02, 0.18, 1)
+    both;
+}
+
+.book-flip-overlay.is-ready .book-flip-spine {
+  animation: book-spine-breathe var(--page-flip-duration, 1100ms) ease both;
+}
+
+.book-flip-overlay.is-ready .book-flip-under-shadow {
+  animation: book-under-page-shadow var(--page-flip-duration, 1100ms) ease both;
+}
+
+.book-flip-overlay.is-ready .book-flip-sheet {
+  animation-play-state: running;
+}
+
+.book-flip-overlay.is-backward .book-flip-front::after,
+.book-flip-overlay.is-backward .book-flip-back::after,
+.book-flip-overlay.is-backward .book-flip-under-shadow {
+  transform: scaleX(-1);
+}
+
+.book-flip-overlay.is-mobile .book-flip-static,
+.book-flip-overlay.is-mobile .book-flip-spine {
+  display: none;
+}
+
+.book-flip-overlay.is-mobile .book-flip-sheet,
+.book-flip-overlay.is-mobile .book-flip-under-shadow {
+  left: 0;
+  width: 100%;
+}
+
+.book-flip-overlay.is-mobile .book-flip-front-copy,
+.book-flip-overlay.is-mobile .book-flip-back-copy {
+  left: 0;
 }
 
 .home-view {
@@ -1551,8 +1797,6 @@ h1 {
   border-color: #64748b;
 }
 
-.page-enter-active,
-.page-leave-active,
 .loader-fade-enter-active,
 .loader-fade-leave-active,
 .mobile-panel-enter-active,
@@ -1560,12 +1804,6 @@ h1 {
   transition:
     opacity 180ms ease,
     transform 180ms ease;
-}
-
-.page-enter-from,
-.page-leave-to {
-  opacity: 0;
-  transform: translateY(8px);
 }
 
 .loader-fade-enter-from,
@@ -1586,6 +1824,158 @@ h1 {
   50% {
     opacity: 1;
     transform: scale(1);
+  }
+}
+
+@keyframes book-overlay-release {
+  0%,
+  90% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes book-sheet-forward {
+  0% {
+    box-shadow: -1px 0 0 rgb(64 47 54 / 0%);
+    transform: rotateY(0deg) translateZ(1px);
+  }
+
+  18% {
+    box-shadow: -8px 2px 18px rgb(64 47 54 / 14%);
+    transform: rotateY(-24deg) translateZ(7px);
+  }
+
+  44% {
+    box-shadow: -26px 5px 42px var(--page-flip-shadow);
+    transform: rotateY(-78deg) translateZ(16px);
+  }
+
+  56% {
+    box-shadow: -30px 5px 50px var(--page-flip-shadow);
+    transform: rotateY(-102deg) translateZ(16px);
+  }
+
+  82% {
+    box-shadow: -12px 2px 24px rgb(64 47 54 / 18%);
+    transform: rotateY(-158deg) translateZ(6px);
+  }
+
+  100% {
+    box-shadow: 0 0 0 rgb(64 47 54 / 0%);
+    transform: rotateY(-180deg) translateZ(1px);
+  }
+}
+
+@keyframes book-sheet-backward {
+  0% {
+    box-shadow: 1px 0 0 rgb(64 47 54 / 0%);
+    transform: rotateY(0deg) translateZ(1px);
+  }
+
+  18% {
+    box-shadow: 8px 2px 18px rgb(64 47 54 / 14%);
+    transform: rotateY(24deg) translateZ(7px);
+  }
+
+  44% {
+    box-shadow: 26px 5px 42px var(--page-flip-shadow);
+    transform: rotateY(78deg) translateZ(16px);
+  }
+
+  56% {
+    box-shadow: 30px 5px 50px var(--page-flip-shadow);
+    transform: rotateY(102deg) translateZ(16px);
+  }
+
+  82% {
+    box-shadow: 12px 2px 24px rgb(64 47 54 / 18%);
+    transform: rotateY(158deg) translateZ(6px);
+  }
+
+  100% {
+    box-shadow: 0 0 0 rgb(64 47 54 / 0%);
+    transform: rotateY(180deg) translateZ(1px);
+  }
+}
+
+@keyframes book-front-shading {
+  0% {
+    opacity: 0.08;
+  }
+
+  30% {
+    opacity: 0.42;
+  }
+
+  49% {
+    opacity: 0.94;
+  }
+
+  58%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes book-back-shading {
+  0%,
+  48% {
+    opacity: 0;
+  }
+
+  58% {
+    opacity: 0.88;
+  }
+
+  80% {
+    opacity: 0.44;
+  }
+
+  100% {
+    opacity: 0.12;
+  }
+}
+
+@keyframes book-spine-breathe {
+  0% {
+    opacity: 0.48;
+    transform: scaleX(0.58);
+  }
+
+  48% {
+    opacity: 1;
+    transform: scaleX(1.15);
+  }
+
+  100% {
+    opacity: 0.38;
+    transform: scaleX(0.72);
+  }
+}
+
+@keyframes book-under-page-shadow {
+  0% {
+    opacity: 0;
+  }
+
+  28% {
+    opacity: 0.4;
+  }
+
+  52% {
+    opacity: 0.92;
+  }
+
+  82% {
+    opacity: 0.32;
+  }
+
+  100% {
+    opacity: 0;
   }
 }
 
@@ -1799,5 +2189,14 @@ h1 {
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
     transition-duration: 0.001ms !important;
+  }
+
+  .book-flip-overlay,
+  .book-flip-sheet,
+  .book-flip-front::after,
+  .book-flip-back::after,
+  .book-flip-spine,
+  .book-flip-under-shadow {
+    animation-duration: var(--page-flip-duration, 1100ms) !important;
   }
 }

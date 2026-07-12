@@ -1,5 +1,7 @@
+import { nextTick } from 'vue';
 import { createRouter, createWebHistory } from 'vue-router';
 import { setGlobalLoading } from './composables/useLoading';
+import { finishRoutePageFlip, startRoutePageFlip } from './composables/usePageFlip';
 import HomeView from './views/HomeView.vue';
 
 export const router = createRouter({
@@ -69,10 +71,13 @@ export const router = createRouter({
   ],
 });
 
-router.beforeEach(() => {
+router.beforeEach((to, from) => {
+  startRoutePageFlip(from, to);
   setGlobalLoading(true);
 });
 
-router.afterEach(() => {
+router.afterEach(async () => {
   setGlobalLoading(false);
+  await nextTick();
+  finishRoutePageFlip();
 });

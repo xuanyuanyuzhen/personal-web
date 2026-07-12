@@ -25,9 +25,12 @@ const searchOpen = ref(false);
 const isPreview = ref(readPreviewMode());
 const lastTrackedVisit = ref('');
 
-const sortedNavigation = computed(() => apiNavigation.value ?? mapLocalNavigation(publicNavigation, t));
-const themeLabel = computed(() => (isDark.value ? t('settings.themeDark') : t('settings.themeLight')));
-
+const sortedNavigation = computed(
+  () => apiNavigation.value ?? mapLocalNavigation(publicNavigation, t),
+);
+const themeLabel = computed(() =>
+  isDark.value ? t('settings.themeDark') : t('settings.themeLight'),
+);
 getVisitorId();
 
 onMounted(() => {
@@ -135,9 +138,7 @@ function resolveVisitTarget() {
         <span
           class="brand-mark"
           aria-hidden="true"
-        >
-          Y
-        </span>
+        > Y </span>
         <span>
           {{ t('app.brand') }}
         </span>
@@ -253,15 +254,12 @@ function resolveVisitTarget() {
 
     <main class="site-main">
       <RouterView v-slot="{ Component, route: activeRoute }">
-        <Transition
-          name="page"
-          mode="out-in"
+        <div
+          :key="activeRoute.fullPath"
+          class="route-page"
         >
-          <component
-            :is="Component"
-            :key="activeRoute.fullPath"
-          />
-        </Transition>
+          <component :is="Component" />
+        </div>
       </RouterView>
     </main>
 
