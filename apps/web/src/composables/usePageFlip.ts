@@ -119,6 +119,11 @@ function createPageFlipOverlay(source: HTMLElement, direction: PageFlipDirection
     document.querySelector<HTMLElement>('.site-header')?.getBoundingClientRect().bottom ?? 0;
   const isMobile = window.matchMedia?.('(max-width: 720px)').matches ?? false;
   const pageInset = isMobile ? 8 : 18;
+  const preferredPageGutter = isMobile ? 16 : 56;
+  const pageGutter = Math.max(
+    0,
+    Math.min(preferredPageGutter, sourceRect.left, window.innerWidth - sourceRect.right),
+  );
   const overlayTop = Math.max(0, headerBottom + pageInset);
   const overlayHeight = Math.max(1, window.innerHeight - overlayTop - pageInset);
   const overlay = document.createElement('div');
@@ -126,12 +131,12 @@ function createPageFlipOverlay(source: HTMLElement, direction: PageFlipDirection
   overlay.className = `book-flip-overlay is-${direction}${isMobile ? ' is-mobile' : ''}`;
   overlay.setAttribute('aria-hidden', 'true');
   overlay.setAttribute('inert', '');
-  overlay.style.left = `${sourceRect.left}px`;
+  overlay.style.left = `${sourceRect.left - pageGutter}px`;
   overlay.style.top = `${overlayTop}px`;
-  overlay.style.width = `${sourceRect.width}px`;
+  overlay.style.width = `${sourceRect.width + pageGutter * 2}px`;
   overlay.style.height = `${overlayHeight}px`;
   overlay.style.setProperty('--book-copy-width', `${sourceRect.width}px`);
-  overlay.style.setProperty('--book-cover-top', `${headerBottom}px`);
+  overlay.style.setProperty('--book-copy-offset', `${pageGutter}px`);
 
   const targetLayer = document.createElement('div');
   const stage = document.createElement('div');

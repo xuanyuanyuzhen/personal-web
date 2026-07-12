@@ -93,6 +93,47 @@ a {
   min-height: 100vh;
 }
 
+.site-shell::before,
+.site-shell::after {
+  background:
+    repeating-linear-gradient(
+      112deg,
+      rgb(255 255 255 / 3%) 0,
+      rgb(255 255 255 / 3%) 1px,
+      rgb(20 10 7 / 5%) 1px,
+      rgb(20 10 7 / 5%) 7px
+    ),
+    linear-gradient(
+      90deg,
+      var(--book-cover-dark),
+      var(--book-cover) 9%,
+      var(--book-cover-light) 48%,
+      var(--book-cover) 91%,
+      var(--book-cover-dark)
+    );
+  bottom: 0;
+  content: '';
+  pointer-events: none;
+  position: fixed;
+  top: 0;
+  width: clamp(56px, 5vw, 96px);
+  z-index: 8;
+}
+
+.site-shell::before {
+  box-shadow:
+    inset -12px 0 20px rgb(20 9 6 / 22%),
+    10px 0 24px rgb(52 29 22 / 12%);
+  left: 0;
+}
+
+.site-shell::after {
+  box-shadow:
+    inset 12px 0 20px rgb(20 9 6 / 22%),
+    -10px 0 24px rgb(52 29 22 / 12%);
+  right: 0;
+}
+
 .site-header {
   align-items: center;
   display: flex;
@@ -347,47 +388,6 @@ a {
   z-index: 1;
 }
 
-.book-flip-overlay::before,
-.book-flip-overlay::after {
-  background:
-    repeating-linear-gradient(
-      112deg,
-      rgb(255 255 255 / 3%) 0,
-      rgb(255 255 255 / 3%) 1px,
-      rgb(20 10 7 / 5%) 1px,
-      rgb(20 10 7 / 5%) 7px
-    ),
-    linear-gradient(
-      90deg,
-      var(--book-cover-dark),
-      var(--book-cover) 9%,
-      var(--book-cover-light) 48%,
-      var(--book-cover) 91%,
-      var(--book-cover-dark)
-    );
-  bottom: 0;
-  content: '';
-  pointer-events: none;
-  position: fixed;
-  top: var(--book-cover-top);
-  width: clamp(56px, 5vw, 96px);
-  z-index: 0;
-}
-
-.book-flip-overlay::before {
-  box-shadow:
-    inset -12px 0 20px rgb(20 9 6 / 22%),
-    10px 0 24px rgb(52 29 22 / 12%);
-  left: 0;
-}
-
-.book-flip-overlay::after {
-  box-shadow:
-    inset 12px 0 20px rgb(20 9 6 / 22%),
-    -10px 0 24px rgb(52 29 22 / 12%);
-  right: 0;
-}
-
 .book-flip-overlay.is-ready {
   animation: book-overlay-release var(--page-flip-duration, 980ms) linear both;
 }
@@ -502,7 +502,7 @@ a {
     var(--book-paper-x) var(--book-paper-y),
     var(--book-paper-x) var(--book-paper-y),
     var(--book-paper-x) var(--book-paper-y);
-  left: 0;
+  left: var(--book-copy-offset, 0);
   margin: 0;
   max-width: none;
   min-height: 100%;
@@ -554,7 +554,7 @@ a {
 }
 
 .book-flip-overlay.is-forward .book-flip-front-copy {
-  left: -100%;
+  left: calc(var(--book-copy-offset, 0px) - 100%);
 }
 
 .book-flip-overlay.is-backward .book-flip-static {
@@ -566,7 +566,7 @@ a {
 }
 
 .book-flip-overlay.is-backward .book-flip-static-copy {
-  left: -100%;
+  left: calc(var(--book-copy-offset, 0px) - 100%);
 }
 
 .book-flip-overlay.is-backward .book-flip-sheet,
@@ -582,7 +582,7 @@ a {
 }
 
 .book-flip-overlay.is-backward .book-flip-back-copy {
-  left: -100%;
+  left: calc(var(--book-copy-offset, 0px) - 100%);
 }
 
 .book-flip-overlay.is-ready .book-flip-front::after {
@@ -644,11 +644,6 @@ a {
   display: none;
 }
 
-.book-flip-overlay.is-mobile::before,
-.book-flip-overlay.is-mobile::after {
-  width: 8px;
-}
-
 .book-flip-overlay.is-mobile .book-flip-sheet,
 .book-flip-overlay.is-mobile .book-flip-under-shadow {
   left: 0;
@@ -657,7 +652,7 @@ a {
 
 .book-flip-overlay.is-mobile .book-flip-front-copy,
 .book-flip-overlay.is-mobile .book-flip-back-copy {
-  left: 0;
+  left: var(--book-copy-offset, 0);
 }
 
 .home-view {
@@ -2116,6 +2111,11 @@ h1 {
 }
 
 @media (width <= 760px) {
+  .site-shell::before,
+  .site-shell::after {
+    width: 8px;
+  }
+
   .site-header {
     align-items: flex-start;
     gap: 12px;
