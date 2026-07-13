@@ -161,7 +161,7 @@ function resolveApiNavigationLabel(
 ): string {
   const localItem = publicNavigation.find(
     (navigationItem) =>
-      navigationItem.id === item.key || (item.path !== null && navigationItem.path === item.path),
+      navigationItem.id === item.key && item.path !== null && navigationItem.path === item.path,
   );
 
   if (localItem && translate) {

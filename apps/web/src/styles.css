@@ -4,11 +4,26 @@
   --bg: #fff7fb;
   --bg-soft: #fff0f6;
   --border: #efd3df;
+  --book-cover: #6b4436;
+  --book-cover-dark: #40271f;
+  --book-cover-light: #946b55;
   --card: rgb(255 255 255 / 76%);
   --ink: #402f36;
   --muted: #715a64;
   --paper-line: rgb(196 91 128 / 12%);
+  --page-flip-crease: rgb(64 47 54 / 26%);
+  --page-flip-highlight: rgb(255 255 255 / 52%);
   --page-flip-shadow: rgb(64 47 54 / 20%);
+  --paper-background:
+    linear-gradient(var(--paper-line) 1px, transparent 1px) 0 0 / 100% 32px,
+    linear-gradient(
+      90deg,
+      rgb(255 255 255 / 0%) 0,
+      rgb(255 255 255 / 0%) 96px,
+      var(--paper-line) 97px,
+      transparent 98px
+    ),
+    linear-gradient(180deg, var(--bg) 0%, var(--bg-soft) 100%);
   --shadow: 0 20px 50px rgb(142 86 112 / 14%);
   --surface: #fff;
 
@@ -26,10 +41,15 @@
   --bg: #241b25;
   --bg-soft: #302431;
   --border: #694c5c;
+  --book-cover: #4c3028;
+  --book-cover-dark: #241714;
+  --book-cover-light: #765246;
   --card: rgb(57 42 58 / 88%);
   --ink: #f7e7ed;
   --muted: #cfb8c2;
   --paper-line: rgb(229 161 184 / 14%);
+  --page-flip-crease: rgb(12 8 12 / 44%);
+  --page-flip-highlight: rgb(255 226 236 / 18%);
   --page-flip-shadow: rgb(5 3 5 / 34%);
   --shadow: 0 18px 48px rgb(12 8 12 / 28%);
   --surface: #352736;
@@ -67,19 +87,45 @@ a {
 }
 
 .site-shell {
-  background:
-    linear-gradient(var(--paper-line) 1px, transparent 1px) 0 0 / 100% 32px,
-    linear-gradient(
-      90deg,
-      rgb(255 255 255 / 0%) 0,
-      rgb(255 255 255 / 0%) 96px,
-      var(--paper-line) 97px,
-      transparent 98px
-    ),
-    linear-gradient(180deg, var(--bg) 0%, var(--bg-soft) 100%);
+  background: var(--paper-background);
   color: var(--ink);
   min-height: 100vh;
   overflow-x: clip;
+}
+
+.site-shell::before,
+.site-shell::after {
+  background:
+    repeating-linear-gradient(
+      112deg,
+      rgb(255 255 255 / 3%) 0,
+      rgb(255 255 255 / 3%) 1px,
+      rgb(20 10 7 / 5%) 1px,
+      rgb(20 10 7 / 5%) 7px
+    ),
+    linear-gradient(
+      90deg,
+      var(--book-cover-dark),
+      var(--book-cover) 12%,
+      var(--book-cover-light) 50%,
+      var(--book-cover) 88%,
+      var(--book-cover-dark)
+    );
+  bottom: 0;
+  content: '';
+  pointer-events: none;
+  position: fixed;
+  top: 0;
+  width: clamp(40px, 4vw, 72px);
+  z-index: 8;
+}
+
+.site-shell::before {
+  left: 0;
+}
+
+.site-shell::after {
+  right: 0;
 }
 
 .site-header {
@@ -327,26 +373,46 @@ a {
 }
 
 .page-leave-active {
+  background: var(--paper-background);
   animation-name: page-content-fold-forward;
   animation-timing-function: cubic-bezier(0.18, 0.78, 0.18, 1);
   backface-visibility: hidden;
+  box-sizing: border-box;
   inset: 0 24px auto;
+  margin: 0;
+  max-width: none;
   overflow: hidden;
   pointer-events: none;
   position: absolute;
-  transform-origin: left center;
+  min-height: calc(100vh - 96px);
+  transform-origin: center center;
   transform-style: preserve-3d;
   width: calc(100% - 48px);
   z-index: 2;
 }
 
+.site-main > .page-leave-active {
+  background: var(--paper-background);
+  margin: 0;
+  max-width: none;
+}
+
 .page-leave-active::after {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--page-flip-shadow) 34%,
+    var(--page-flip-crease) 49%,
+    var(--page-flip-highlight) 58%,
+    transparent
+  );
   content: '';
   inset-block: 0;
+  left: calc(50% - 40px);
   opacity: 0;
   pointer-events: none;
   position: absolute;
-  width: clamp(28px, 7%, 72px);
+  width: 80px;
   will-change: opacity, transform;
 }
 
@@ -354,30 +420,26 @@ a {
   animation-name: page-content-fold-forward;
   animation-timing-function: cubic-bezier(0.18, 0.78, 0.18, 1);
   backface-visibility: hidden;
-  transform-origin: left center;
+  transform-origin: center center;
 }
 
 :root[data-page-flip-direction='forward'] .page-leave-active::after {
   animation: page-fold-crease var(--page-flip-duration, 180ms) cubic-bezier(0.18, 0.78, 0.18, 1)
     both;
-  background: linear-gradient(90deg, var(--page-flip-shadow), transparent);
-  left: 0;
-  transform-origin: left center;
+  transform-origin: center center;
 }
 
 :root[data-page-flip-direction='backward'] .page-leave-active {
   animation-name: page-content-fold-backward;
   animation-timing-function: cubic-bezier(0.18, 0.78, 0.18, 1);
   backface-visibility: hidden;
-  transform-origin: right center;
+  transform-origin: center center;
 }
 
 :root[data-page-flip-direction='backward'] .page-leave-active::after {
   animation: page-fold-crease var(--page-flip-duration, 180ms) cubic-bezier(0.18, 0.78, 0.18, 1)
     both;
-  background: linear-gradient(270deg, var(--page-flip-shadow), transparent);
-  right: 0;
-  transform-origin: right center;
+  transform-origin: center center;
 }
 
 .home-view {
@@ -1794,6 +1856,11 @@ h1 {
 }
 
 @media (width <= 760px) {
+  .site-shell::before,
+  .site-shell::after {
+    width: 6px;
+  }
+
   .site-header {
     align-items: stretch;
     display: grid;
@@ -1855,6 +1922,11 @@ h1 {
 
   .site-main {
     padding: 0 16px 40px;
+  }
+
+  .page-leave-active::after {
+    left: calc(50% - 28px);
+    width: 56px;
   }
 
   .home-view {
