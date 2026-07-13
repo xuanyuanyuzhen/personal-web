@@ -97,7 +97,6 @@ function handleScroll() {
   <section
     class="essays-page"
     aria-labelledby="essays-title"
-    :aria-busy="isLoading"
   >
     <p class="page-placeholder-eyebrow">
       {{ t('nav.essays') }}

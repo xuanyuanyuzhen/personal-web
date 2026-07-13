@@ -58,7 +58,6 @@ async function toggleLike() {
   <article
     v-if="essay"
     class="essay-detail"
-    :aria-busy="isLoading"
   >
     <p class="page-placeholder-eyebrow">
       {{ essay.category?.name ?? '随笔' }}
@@ -102,7 +101,6 @@ async function toggleLike() {
   <section
     v-else
     class="custom-page"
-    :aria-busy="isLoading"
   >
     <p class="page-placeholder-eyebrow">
       随笔

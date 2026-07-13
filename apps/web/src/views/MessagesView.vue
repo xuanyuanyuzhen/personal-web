@@ -119,7 +119,6 @@ function avatarText(message: PublicMessage) {
   <section
     class="messages-page"
     aria-labelledby="messages-title"
-    :aria-busy="isLoading"
   >
     <p class="page-placeholder-eyebrow">
       {{ t('nav.messages') }}

@@ -254,12 +254,12 @@ function resolveVisitTarget() {
 
     <main class="site-main">
       <RouterView v-slot="{ Component, route: activeRoute }">
-        <div
-          :key="activeRoute.fullPath"
-          class="route-page"
-        >
-          <component :is="Component" />
-        </div>
+        <Transition name="page">
+          <component
+            :is="Component"
+            :key="activeRoute.fullPath"
+          />
+        </Transition>
       </RouterView>
     </main>
 

@@ -135,7 +135,6 @@ async function closePreview() {
     <section
       class="photos-page"
       aria-labelledby="photos-title"
-      :aria-busy="isLoading"
     >
       <p class="page-placeholder-eyebrow">
         {{ t('nav.photos') }}

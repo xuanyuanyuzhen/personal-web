@@ -1,8 +1,7 @@
 type PageFlipDirection = 'backward' | 'forward';
 
-const pageFlipDuration = 820;
-const pageSnapshotQuietPeriod = 120;
-const pageSnapshotMaxWait = 900;
+const pageFlipDuration = 620;
+const pageFlipCleanupDelay = 500;
 
 const pageOrder: Record<string, number> = {
   home: 0,
@@ -23,8 +22,8 @@ const pagePathOrder: Array<[RegExp, number]> = [
   [/^\/about\/?$/, pageOrder.about],
 ];
 
-let pageFlipOverlay: HTMLElement | null = null;
 let pageFlipTimer: number | undefined;
+let pageFlipSequence = 0;
 
 export function startRoutePageFlip(fromRoute: unknown, toRoute: unknown) {
   const fromIndex = resolvePageOrder(fromRoute);
@@ -34,70 +33,42 @@ export function startRoutePageFlip(fromRoute: unknown, toRoute: unknown) {
     return;
   }
 
-  const direction = toIndex > fromIndex ? 'forward' : 'backward';
+  if (typeof document === 'undefined' || typeof window === 'undefined') {
+    return;
+  }
 
   stopPageFlip();
 
-  if (typeof document === 'undefined') {
-    return;
-  }
+  const direction = toIndex > fromIndex ? 'forward' : 'backward';
 
-  const source = document.querySelector<HTMLElement>('.route-page');
-
-  if (!source) {
-    return;
-  }
-
-  const overlay = createPageFlipOverlay(source, direction);
-
-  document.body.append(overlay);
-  document.documentElement.dataset.pageFlipDirection = direction;
-  document.documentElement.style.setProperty('--page-flip-duration', `${pageFlipDuration}ms`);
-  pageFlipOverlay = overlay;
-
-  overlay.addEventListener('animationend', (event) => {
-    if (event.target === overlay) {
-      stopPageFlip();
-    }
-  });
-  pageFlipTimer = window.setTimeout(stopPageFlip, pageFlipDuration + 1000);
+  applyPageFlipVars(direction);
 }
 
-export async function finishRoutePageFlip(options: { waitForContent?: boolean } = {}) {
-  if (!pageFlipOverlay || typeof document === 'undefined') {
+export function armRoutePageFlipCleanup() {
+  if (
+    typeof document === 'undefined' ||
+    typeof window === 'undefined' ||
+    !document.documentElement.dataset.pageFlipDirection
+  ) {
     return;
   }
-
-  const overlay = pageFlipOverlay;
-  const target = document.querySelector<HTMLElement>('.route-page');
-  const targetLayer = overlay.querySelector<HTMLElement>('.book-flip-target');
-  const back = overlay.querySelector<HTMLElement>('.book-flip-back');
-
-  if (!target || !targetLayer || !back) {
-    stopPageFlip();
-    return;
-  }
-
-  if (options.waitForContent !== false) {
-    await waitForPageSnapshot(target);
-  }
-
-  if (pageFlipOverlay !== overlay || !target.isConnected) {
-    return;
-  }
-
-  targetLayer.replaceChildren(createPageCopy(target, 'book-flip-target-copy', overlay));
-  back.replaceChildren(createPageCopy(target, 'book-flip-back-copy', overlay));
-  overlay.getBoundingClientRect();
-  overlay.classList.add('is-ready');
 
   if (pageFlipTimer) {
     window.clearTimeout(pageFlipTimer);
   }
-  pageFlipTimer = window.setTimeout(stopPageFlip, pageFlipDuration + 160);
+
+  const sequence = pageFlipSequence;
+
+  pageFlipTimer = window.setTimeout(() => {
+    if (sequence === pageFlipSequence) {
+      stopPageFlip();
+    }
+  }, pageFlipDuration + pageFlipCleanupDelay);
 }
 
 function stopPageFlip() {
+  pageFlipSequence += 1;
+
   if (pageFlipTimer) {
     window.clearTimeout(pageFlipTimer);
     pageFlipTimer = undefined;
@@ -107,134 +78,13 @@ function stopPageFlip() {
     return;
   }
 
-  pageFlipOverlay?.remove();
-  pageFlipOverlay = null;
   delete document.documentElement.dataset.pageFlipDirection;
   document.documentElement.style.removeProperty('--page-flip-duration');
 }
 
-function createPageFlipOverlay(source: HTMLElement, direction: PageFlipDirection) {
-  const sourceRect = source.getBoundingClientRect();
-  const headerBottom =
-    document.querySelector<HTMLElement>('.site-header')?.getBoundingClientRect().bottom ?? 0;
-  const isMobile = window.matchMedia?.('(max-width: 720px)').matches ?? false;
-  const pageInset = isMobile ? 8 : 18;
-  const preferredPageGutter = isMobile ? 16 : 56;
-  const pageGutter = Math.max(
-    0,
-    Math.min(preferredPageGutter, sourceRect.left, window.innerWidth - sourceRect.right),
-  );
-  const overlayTop = Math.max(0, headerBottom + pageInset);
-  const overlayHeight = Math.max(1, window.innerHeight - overlayTop - pageInset);
-  const overlay = document.createElement('div');
-
-  overlay.className = `book-flip-overlay is-${direction}${isMobile ? ' is-mobile' : ''}`;
-  overlay.setAttribute('aria-hidden', 'true');
-  overlay.setAttribute('inert', '');
-  overlay.style.left = `${sourceRect.left - pageGutter}px`;
-  overlay.style.top = `${overlayTop}px`;
-  overlay.style.width = `${sourceRect.width + pageGutter * 2}px`;
-  overlay.style.height = `${overlayHeight}px`;
-  overlay.style.setProperty('--book-copy-width', `${sourceRect.width}px`);
-  overlay.style.setProperty('--book-copy-offset', `${pageGutter}px`);
-
-  const targetLayer = document.createElement('div');
-  const stage = document.createElement('div');
-  const staticHalf = document.createElement('div');
-  const sheet = document.createElement('div');
-  const front = document.createElement('div');
-  const back = document.createElement('div');
-  const spine = document.createElement('div');
-
-  stage.className = 'book-flip-stage';
-  targetLayer.className = 'book-flip-target';
-  staticHalf.className = 'book-flip-static';
-  sheet.className = 'book-flip-sheet';
-  front.className = 'book-flip-face book-flip-front';
-  back.className = 'book-flip-face book-flip-back';
-  spine.className = 'book-flip-spine';
-
-  staticHalf.append(createPageCopy(source, 'book-flip-static-copy', overlay));
-  front.append(createPageCopy(source, 'book-flip-front-copy', overlay));
-  sheet.append(front, back);
-  stage.append(targetLayer, staticHalf, sheet, spine);
-  overlay.append(stage);
-
-  return overlay;
-}
-
-function createPageCopy(source: HTMLElement, className: string, overlay: HTMLElement) {
-  const sourceRect = source.getBoundingClientRect();
-  const overlayTop = overlay.isConnected
-    ? overlay.getBoundingClientRect().top
-    : Number.parseFloat(overlay.style.top) || 0;
-  const copy = source.cloneNode(true) as HTMLElement;
-
-  copy.className = `${copy.className} book-flip-copy ${className}`;
-  copy.querySelectorAll('[id]').forEach((element) => element.removeAttribute('id'));
-  copy.querySelectorAll('[autofocus]').forEach((element) => element.removeAttribute('autofocus'));
-  copy.style.width = 'var(--book-copy-width)';
-  copy.style.top = `${sourceRect.top - overlayTop}px`;
-  copy.style.setProperty('--book-paper-x', `${-(window.scrollX + sourceRect.left)}px`);
-  copy.style.setProperty('--book-paper-y', `${-(window.scrollY + sourceRect.top)}px`);
-
-  return copy;
-}
-
-function waitForPageSnapshot(target: HTMLElement) {
-  return new Promise<void>((resolve) => {
-    let quietTimer: number | undefined;
-    let pollTimer: number | undefined;
-    let settled = false;
-
-    const observer = new MutationObserver(scheduleCheck);
-    const maxTimer = window.setTimeout(complete, pageSnapshotMaxWait);
-
-    function complete() {
-      if (settled) {
-        return;
-      }
-
-      settled = true;
-      observer.disconnect();
-      window.clearTimeout(maxTimer);
-      if (quietTimer) {
-        window.clearTimeout(quietTimer);
-      }
-      if (pollTimer) {
-        window.clearTimeout(pollTimer);
-      }
-      resolve();
-    }
-
-    function scheduleCheck() {
-      if (quietTimer) {
-        window.clearTimeout(quietTimer);
-      }
-      if (pollTimer) {
-        window.clearTimeout(pollTimer);
-      }
-
-      const pageBusy = Boolean(target.querySelector('[aria-busy="true"]'));
-      const imagePending = Array.from(target.querySelectorAll('img')).some(
-        (image) => !image.complete,
-      );
-
-      if (pageBusy || imagePending) {
-        pollTimer = window.setTimeout(scheduleCheck, 60);
-        return;
-      }
-
-      quietTimer = window.setTimeout(complete, pageSnapshotQuietPeriod);
-    }
-
-    observer.observe(target, {
-      attributes: true,
-      childList: true,
-      subtree: true,
-    });
-    scheduleCheck();
-  });
+function applyPageFlipVars(direction: PageFlipDirection) {
+  document.documentElement.dataset.pageFlipDirection = direction;
+  document.documentElement.style.setProperty('--page-flip-duration', `${pageFlipDuration}ms`);
 }
 
 function resolvePageOrder(name: unknown): number | null {

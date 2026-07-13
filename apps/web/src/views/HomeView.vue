@@ -10,7 +10,6 @@ const ANNOUNCEMENT_DISMISSED_KEY = 'yuer.home.announcement.dismissed';
 
 const settings = ref<SiteSettings | null>(null);
 const announcement = ref<PublicAnnouncement | null>(null);
-const isLoading = ref(true);
 const announcementDismissed = ref(localStorage.getItem(ANNOUNCEMENT_DISMISSED_KEY) === '1');
 const siteLike = ref({
   likeCount: 0,
@@ -35,26 +34,22 @@ onBeforeUnmount(() => {
 });
 
 async function loadHomeData() {
-  try {
-    const [nextSettings, nextAnnouncement, nextSiteLike] = await Promise.allSettled([
-      publicApi.getSiteSettings(),
-      publicApi.getAnnouncement(),
-      publicApi.getSiteLikeStatus(),
-    ]);
+  const [nextSettings, nextAnnouncement, nextSiteLike] = await Promise.allSettled([
+    publicApi.getSiteSettings(),
+    publicApi.getAnnouncement(),
+    publicApi.getSiteLikeStatus(),
+  ]);
 
-    if (nextSettings.status === 'fulfilled') {
-      settings.value = nextSettings.value;
-    }
+  if (nextSettings.status === 'fulfilled') {
+    settings.value = nextSettings.value;
+  }
 
-    if (nextAnnouncement.status === 'fulfilled') {
-      announcement.value = nextAnnouncement.value;
-    }
+  if (nextAnnouncement.status === 'fulfilled') {
+    announcement.value = nextAnnouncement.value;
+  }
 
-    if (nextSiteLike.status === 'fulfilled') {
-      siteLike.value = nextSiteLike.value;
-    }
-  } finally {
-    isLoading.value = false;
+  if (nextSiteLike.status === 'fulfilled') {
+    siteLike.value = nextSiteLike.value;
   }
 }
 
@@ -86,7 +81,6 @@ async function toggleSiteLike() {
   <section
     class="home-view"
     aria-labelledby="home-title"
-    :aria-busy="isLoading"
   >
     <div class="intro">
       <p class="eyebrow">
