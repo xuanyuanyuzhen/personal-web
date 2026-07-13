@@ -25,8 +25,8 @@
   --accent-strong: #ffd2df;
   --bg: #241b25;
   --bg-soft: #302431;
-  --border: #5b4350;
-  --card: rgb(54 40 55 / 78%);
+  --border: #694c5c;
+  --card: rgb(57 42 58 / 88%);
   --ink: #f7e7ed;
   --muted: #cfb8c2;
   --paper-line: rgb(229 161 184 / 14%);
@@ -79,29 +79,26 @@ a {
     linear-gradient(180deg, var(--bg) 0%, var(--bg-soft) 100%);
   color: var(--ink);
   min-height: 100vh;
+  overflow-x: clip;
 }
 
 .site-header {
   align-items: center;
+  backdrop-filter: blur(16px);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  border-bottom: 1px solid var(--border);
+  box-sizing: border-box;
   display: flex;
   gap: 20px;
   justify-content: space-between;
-  margin: 0 auto;
-  max-width: 1120px;
-  padding: 20px 24px;
+  padding: 20px max(24px, calc((100% - 1120px) / 2));
   position: sticky;
   top: 0;
   z-index: 10;
 }
 
 .site-header::before {
-  backdrop-filter: blur(16px);
-  background: color-mix(in srgb, var(--bg) 88%, transparent);
-  border-bottom: 1px solid var(--border);
-  content: '';
-  inset: 0 calc(50% - 50vw);
-  position: absolute;
-  z-index: -1;
+  content: none;
 }
 
 .brand {
@@ -387,7 +384,7 @@ a {
   align-items: center;
   display: grid;
   gap: 40px;
-  grid-template-columns: minmax(0, 1fr) minmax(220px, 320px);
+  grid-template-columns: minmax(0, 760px);
   min-height: calc(100vh - 96px);
   padding: 48px 0;
 }
@@ -1798,9 +1795,11 @@ h1 {
 
 @media (width <= 760px) {
   .site-header {
-    align-items: flex-start;
-    gap: 12px;
-    padding: 14px 16px;
+    align-items: stretch;
+    display: grid;
+    gap: 10px;
+    grid-template-columns: 1fr;
+    padding: 12px 16px;
   }
 
   .desktop-nav {
@@ -1808,14 +1807,18 @@ h1 {
   }
 
   .site-actions {
-    flex-wrap: wrap;
-    justify-content: flex-end;
+    display: grid;
+    gap: 6px;
+    grid-template-columns: minmax(88px, 1fr) repeat(4, auto);
+    width: 100%;
   }
 
   .site-actions select,
   .site-actions button {
-    max-width: 128px;
+    max-width: none;
+    min-width: 0;
     min-height: 38px;
+    padding-inline: 9px;
   }
 
   .search-toggle {

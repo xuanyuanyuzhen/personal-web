@@ -31,13 +31,14 @@ const messages: Record<Locale, Record<string, string>> = {
     'error.check.network': '网络路径已请求',
     'error.check.service': '目标服务未返回可用页面',
     'home.announcement': '站点公告',
-    'home.intro':
-      '一处安静记录的个人站，先把日常、碎念、随笔和照片温柔地收在这里。',
+    'home.announcementBody': '这里会安静收纳碎片、随笔、照片和留言。',
+    'home.intro': '一处安静记录的个人站，先把日常、碎念、随笔和照片温柔地收在这里。',
     'home.kicker': '轩辕宇振的个人记录站',
     'home.like': '喜欢本站',
     'home.liked': '已喜欢本站',
     'home.mascot': '看板娘占位',
     'mascot.label': '看板娘',
+    'mascot.welcome': '欢迎回来，今天也慢慢记录吧。',
     'music.label': '音乐播放器',
     'music.list': '顺序',
     'music.mode': '播放模式',
@@ -94,23 +95,26 @@ const messages: Record<Locale, Record<string, string>> = {
     'action.retry': 'Try again',
     'app.brand': 'Yuer',
     'app.preview': 'Preview mode',
-    'error.404.body': 'The requested address does not map to an available resource. It may have moved, been removed, or been typed incorrectly.',
+    'error.404.body':
+      'The requested address does not map to an available resource. It may have moved, been removed, or been typed incorrectly.',
     'error.404.label': 'Route not found',
     'error.404.title': '404',
-    'error.500.body': 'The service did not complete the response. Reload in a moment, or go back to keep browsing.',
+    'error.500.body':
+      'The service did not complete the response. Reload in a moment, or go back to keep browsing.',
     'error.500.label': 'Service unavailable',
     'error.500.title': '500',
     'error.check.browser': 'Browser connection available',
     'error.check.network': 'Network path requested',
     'error.check.service': 'Target service did not return a usable page',
     'home.announcement': 'Notice',
-    'home.intro':
-      'A quiet personal journal for daily notes, thoughts, essays, and photos.',
+    'home.announcementBody': 'A quiet place for notes, essays, photos, and messages.',
+    'home.intro': 'A quiet personal journal for daily notes, thoughts, essays, and photos.',
     'home.kicker': 'Xuanyuan Yuzhen personal journal',
     'home.like': 'Like this site',
     'home.liked': 'Liked this site',
     'home.mascot': 'Mascot placeholder',
     'mascot.label': 'Mascot',
+    'mascot.welcome': 'Welcome back. Take your time and keep recording.',
     'music.label': 'Music player',
     'music.list': 'List',
     'music.mode': 'Play mode',
@@ -135,7 +139,8 @@ const messages: Record<Locale, Record<string, string>> = {
     'page.messages.body':
       'The guestbook form and public message stream will reuse the prepared visitorId.',
     'page.messages.title': 'Guestbook',
-    'page.notFound.body': 'The requested address does not map to an available resource. It may have moved, been removed, or been typed incorrectly.',
+    'page.notFound.body':
+      'The requested address does not map to an available resource. It may have moved, been removed, or been typed incorrectly.',
     'page.notFound.title': '404',
     'page.photos.body': 'Thumbnails, album filters, and preview will be added by the photo module.',
     'page.photos.title': 'Photos',
@@ -168,22 +173,26 @@ const messages: Record<Locale, Record<string, string>> = {
     'action.retry': 'もう一度',
     'app.brand': '語爾',
     'app.preview': 'プレビューモード',
-    'error.404.body': '指定されたアドレスに対応するリソースがありません。移動、削除、または入力違いの可能性があります。',
+    'error.404.body':
+      '指定されたアドレスに対応するリソースがありません。移動、削除、または入力違いの可能性があります。',
     'error.404.label': 'Route not found',
     'error.404.title': '404',
-    'error.500.body': 'サービスが応答を完了できませんでした。少し待って再読み込みするか、前のページに戻ってください。',
+    'error.500.body':
+      'サービスが応答を完了できませんでした。少し待って再読み込みするか、前のページに戻ってください。',
     'error.500.label': 'Service unavailable',
     'error.500.title': '500',
     'error.check.browser': 'ブラウザ接続は利用可能',
     'error.check.network': 'ネットワーク経路をリクエスト済み',
     'error.check.service': '対象サービスが利用可能なページを返しませんでした',
     'home.announcement': 'お知らせ',
+    'home.announcementBody': 'つぶやき、随筆、写真、メッセージを静かに残す場所です。',
     'home.intro': '日々のこと、短いメモ、随筆、写真を静かに置いておく個人サイトです。',
     'home.kicker': '軒轅宇振の個人記録サイト',
     'home.like': 'このサイトが好き',
     'home.liked': 'このサイトが好き済み',
     'home.mascot': '看板娘プレースホルダー',
     'mascot.label': '看板娘',
+    'mascot.welcome': 'おかえりなさい。今日もゆっくり記録しましょう。',
     'music.label': '音楽プレーヤー',
     'music.list': '順番',
     'music.mode': '再生モード',
@@ -198,20 +207,20 @@ const messages: Record<Locale, Record<string, string>> = {
     'nav.about': '私について',
     'nav.essays': '随筆',
     'nav.home': 'ホーム',
-    'nav.messages': '留言板',
-    'nav.photos': '写真壁',
+    'nav.messages': 'ゲストブック',
+    'nav.photos': '写真',
     'nav.thoughts': 'つぶやき',
     'page.about.body': 'プロフィール、趣味、サイトについては公開設定 API から接続予定です。',
     'page.about.title': '私について',
     'page.essays.body': '随筆一覧と詳細は、公開済みの公開記事だけを読み込みます。',
     'page.essays.title': '随筆',
-    'page.messages.body':
-      '留言フォームと公開留言一覧は、準備済みの visitorId を再利用します。',
-    'page.messages.title': '留言板',
-    'page.notFound.body': '指定されたアドレスに対応するリソースがありません。移動、削除、または入力違いの可能性があります。',
+    'page.messages.body': '留言フォームと公開留言一覧は、準備済みの visitorId を再利用します。',
+    'page.messages.title': 'ゲストブック',
+    'page.notFound.body':
+      '指定されたアドレスに対応するリソースがありません。移動、削除、または入力違いの可能性があります。',
     'page.notFound.title': '404',
     'page.photos.body': 'サムネイル、アルバム絞り込み、プレビューは写真モジュールで追加します。',
-    'page.photos.title': '写真壁',
+    'page.photos.title': '写真',
     'page.thoughts.body': '短いつぶやきはここに並び、公開リスト API だけを使います。',
     'page.thoughts.title': 'つぶやき',
     'settings.language': '言語',
@@ -259,7 +268,8 @@ export function setLocale(nextLocale: Locale | string): void {
   }
 
   if (typeof document !== 'undefined') {
-    document.documentElement.lang = nextLocale === 'ja' ? 'ja' : nextLocale === 'en' ? 'en' : 'zh-CN';
+    document.documentElement.lang =
+      nextLocale === 'ja' ? 'ja' : nextLocale === 'en' ? 'en' : 'zh-CN';
   }
 }
 

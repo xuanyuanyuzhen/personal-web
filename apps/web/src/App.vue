@@ -25,8 +25,10 @@ const searchOpen = ref(false);
 const isPreview = ref(readPreviewMode());
 const lastTrackedVisit = ref('');
 
-const sortedNavigation = computed(
-  () => apiNavigation.value ?? mapLocalNavigation(publicNavigation, t),
+const sortedNavigation = computed(() =>
+  apiNavigation.value
+    ? mapApiNavigation(apiNavigation.value, t)
+    : mapLocalNavigation(publicNavigation, t),
 );
 const themeLabel = computed(() =>
   isDark.value ? t('settings.themeDark') : t('settings.themeLight'),
@@ -57,7 +59,7 @@ function updateLocale(event) {
 
 async function loadPublicNavigation() {
   try {
-    apiNavigation.value = mapApiNavigation(await publicApi.getNavigation());
+    apiNavigation.value = await publicApi.getNavigation();
   } catch {
     apiNavigation.value = null;
   }

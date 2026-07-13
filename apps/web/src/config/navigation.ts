@@ -96,20 +96,27 @@ export function mapLocalNavigation(
     .sort(compareNavigationOrder);
 }
 
-export function mapApiNavigation(navigation: ApiNavigationItem[]): RenderedNavigationItem[] {
+export function mapApiNavigation(
+  navigation: ApiNavigationItem[],
+  translate?: (key: string) => string,
+): RenderedNavigationItem[] {
   return navigation
-    .map((item, index) => mapApiNavigationItem(item, index))
+    .map((item, index) => mapApiNavigationItem(item, index, translate))
     .filter((item): item is RenderedNavigationItem => item !== null)
     .sort(compareNavigationOrder);
 }
 
-function mapApiNavigationItem(item: ApiNavigationItem, index: number): RenderedNavigationItem | null {
+function mapApiNavigationItem(
+  item: ApiNavigationItem,
+  index: number,
+  translate?: (key: string) => string,
+): RenderedNavigationItem | null {
   const type = item.type.toUpperCase();
   const base = {
     id: String(item.id),
-    label: item.title || item.page?.title || item.key,
+    label: resolveApiNavigationLabel(item, translate),
     order: typeof item.sortOrder === 'number' ? item.sortOrder : index,
-    children: mapApiNavigation(item.children ?? []),
+    children: mapApiNavigation(item.children ?? [], translate),
   };
 
   if (type === 'EXTERNAL') {
@@ -148,6 +155,25 @@ function mapApiNavigationItem(item: ApiNavigationItem, index: number): RenderedN
   };
 }
 
-function compareNavigationOrder(first: RenderedNavigationItem, second: RenderedNavigationItem): number {
+function resolveApiNavigationLabel(
+  item: ApiNavigationItem,
+  translate?: (key: string) => string,
+): string {
+  const localItem = publicNavigation.find(
+    (navigationItem) =>
+      navigationItem.id === item.key || (item.path !== null && navigationItem.path === item.path),
+  );
+
+  if (localItem && translate) {
+    return translate(localItem.labelKey);
+  }
+
+  return item.title || item.page?.title || item.key;
+}
+
+function compareNavigationOrder(
+  first: RenderedNavigationItem,
+  second: RenderedNavigationItem,
+): number {
   return first.order - second.order;
 }

@@ -5,7 +5,7 @@ import { useI18n } from '../composables/useI18n';
 import { publicApi } from '../services/api';
 
 const route = useRoute();
-const { t } = useI18n();
+const { locale, t } = useI18n();
 const mascot = ref(null);
 const activeLine = ref('');
 const imageFailed = ref(false);
@@ -22,12 +22,14 @@ watch(
   },
 );
 
+watch(locale, updateActiveLine);
+
 async function loadMascot() {
   try {
     const nextMascot = await publicApi.getMascot(pageKey.value);
     mascot.value = isValidMascot(nextMascot) ? nextMascot : null;
     imageFailed.value = false;
-    activeLine.value = mascot.value?.pageLine?.content ?? mascot.value?.name ?? '';
+    updateActiveLine();
   } catch {
     mascot.value = null;
     activeLine.value = '';
@@ -35,12 +37,20 @@ async function loadMascot() {
 }
 
 function showRandomLine() {
+  if (locale.value !== 'zh') {
+    activeLine.value = t('mascot.welcome');
+    return;
+  }
+
   const lines = mascot.value?.randomLines ?? [];
   if (lines.length === 0) {
     return;
   }
 
-  const totalWeight = lines.reduce((total, line) => total + Math.max(1, Number(line.weight) || 1), 0);
+  const totalWeight = lines.reduce(
+    (total, line) => total + Math.max(1, Number(line.weight) || 1),
+    0,
+  );
   let cursor = Math.random() * totalWeight;
 
   for (const line of lines) {
@@ -52,6 +62,13 @@ function showRandomLine() {
   }
 
   activeLine.value = lines.at(-1)?.content ?? activeLine.value;
+}
+
+function updateActiveLine() {
+  activeLine.value =
+    locale.value === 'zh'
+      ? (mascot.value?.pageLine?.content ?? mascot.value?.name ?? '')
+      : t('mascot.welcome');
 }
 
 function resolvePageKey(routeName) {

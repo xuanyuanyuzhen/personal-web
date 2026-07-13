@@ -4,7 +4,7 @@ import HeartLikeButton from '../components/HeartLikeButton.vue';
 import { useI18n } from '../composables/useI18n';
 import { publicApi, type PublicAnnouncement, type SiteSettings } from '../services/api';
 
-const { t } = useI18n();
+const { locale, t } = useI18n();
 
 const ANNOUNCEMENT_DISMISSED_KEY = 'yuer.home.announcement.dismissed';
 
@@ -17,9 +17,29 @@ const siteLike = ref({
 });
 const likeBusy = ref(false);
 
-const siteName = computed(() => settings.value?.siteName || t('home.title'));
-const publicName = computed(() => settings.value?.publicName || t('home.kicker'));
-const homeIntroduction = computed(() => settings.value?.homeIntroduction || t('home.intro'));
+const siteName = computed(() =>
+  locale.value === 'zh' && settings.value?.siteName ? settings.value.siteName : t('home.title'),
+);
+const publicName = computed(() =>
+  locale.value === 'zh' && settings.value?.publicName
+    ? settings.value.publicName
+    : t('home.kicker'),
+);
+const homeIntroduction = computed(() =>
+  locale.value === 'zh' && settings.value?.homeIntroduction
+    ? settings.value.homeIntroduction
+    : t('home.intro'),
+);
+const announcementTitle = computed(() =>
+  locale.value === 'zh' && announcement.value?.title
+    ? announcement.value.title
+    : t('home.announcement'),
+);
+const announcementContent = computed(() =>
+  locale.value === 'zh' && announcement.value?.content
+    ? announcement.value.content
+    : t('home.announcementBody'),
+);
 const showAnnouncement = computed(() =>
   Boolean(announcement.value && !announcementDismissed.value),
 );
@@ -108,10 +128,10 @@ async function toggleSiteLike() {
         aria-label="site notice"
       >
         <div class="notice-strip-header">
-          <span>{{ announcement.title }}</span>
+          <span>{{ announcementTitle }}</span>
           <button
             type="button"
-            aria-label="关闭公告"
+            :aria-label="t('action.close')"
             @click="closeAnnouncement"
           >
             ×
@@ -119,23 +139,18 @@ async function toggleSiteLike() {
         </div>
         <!-- eslint-disable vue/no-v-html -->
         <div
+          v-if="locale === 'zh'"
           class="notice-strip-content"
-          v-html="announcement.content"
+          v-html="announcementContent"
         />
         <!-- eslint-enable vue/no-v-html -->
+        <p
+          v-else
+          class="notice-strip-content"
+        >
+          {{ announcementContent }}
+        </p>
       </aside>
-    </div>
-    <div
-      class="mascot-card"
-      :aria-label="t('home.mascot')"
-    >
-      <div
-        class="mascot-card-figure"
-        aria-hidden="true"
-      >
-        <span />
-      </div>
-      <p>{{ t('home.mascot') }}</p>
     </div>
   </section>
 </template>
