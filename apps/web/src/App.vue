@@ -8,6 +8,7 @@ import SearchDialog from './components/SearchDialog.vue';
 import { mapApiNavigation, mapLocalNavigation, publicNavigation } from './config/navigation';
 import { useI18n } from './composables/useI18n';
 import { useLoading } from './composables/useLoading';
+import { capturePageTurnTarget, clearPageTurnSnapshots } from './composables/usePageTurnSnapshot';
 import { useTheme } from './composables/useTheme';
 import { publicApi } from './services/api';
 import { readPreviewMode } from './utils/preview';
@@ -256,7 +257,12 @@ function resolveVisitTarget() {
 
     <main class="site-main">
       <RouterView v-slot="{ Component, route: activeRoute }">
-        <Transition name="page">
+        <Transition
+          name="page"
+          @enter="capturePageTurnTarget"
+          @after-enter="clearPageTurnSnapshots"
+          @enter-cancelled="clearPageTurnSnapshots"
+        >
           <component
             :is="Component"
             :key="activeRoute.fullPath"

@@ -353,16 +353,13 @@ a {
   min-height: calc(100vh - 96px);
   padding: 0 24px 56px;
   position: relative;
-  perspective: 1900px;
-  perspective-origin: 50% 38%;
 }
 
 .page-enter-active,
 .page-leave-active {
   animation-duration: var(--page-flip-duration, 180ms);
   animation-fill-mode: both;
-  transform-style: preserve-3d;
-  will-change: opacity, transform;
+  will-change: clip-path, opacity;
 }
 
 .page-enter-active {
@@ -374,9 +371,8 @@ a {
 
 .page-leave-active {
   background: var(--paper-background);
-  animation-name: page-content-fold-forward;
+  animation-name: page-curl-front-forward;
   animation-timing-function: cubic-bezier(0.18, 0.78, 0.18, 1);
-  backface-visibility: hidden;
   box-sizing: border-box;
   inset: 0 24px auto;
   margin: 0;
@@ -385,8 +381,6 @@ a {
   pointer-events: none;
   position: absolute;
   min-height: calc(100vh - 96px);
-  transform-origin: center center;
-  transform-style: preserve-3d;
   width: calc(100% - 48px);
   z-index: 2;
 }
@@ -397,49 +391,83 @@ a {
   max-width: none;
 }
 
-.page-leave-active::after {
-  background: linear-gradient(
-    90deg,
-    transparent,
-    var(--page-flip-shadow) 34%,
-    var(--page-flip-crease) 49%,
-    var(--page-flip-highlight) 58%,
-    transparent
-  );
-  content: '';
-  inset-block: 0;
-  left: calc(50% - 40px);
-  opacity: 0;
-  pointer-events: none;
-  position: absolute;
-  width: 80px;
-  will-change: opacity, transform;
-}
-
 :root[data-page-flip-direction='forward'] .page-leave-active {
-  animation-name: page-content-fold-forward;
-  animation-timing-function: cubic-bezier(0.18, 0.78, 0.18, 1);
-  backface-visibility: hidden;
-  transform-origin: center center;
-}
-
-:root[data-page-flip-direction='forward'] .page-leave-active::after {
-  animation: page-fold-crease var(--page-flip-duration, 180ms) cubic-bezier(0.18, 0.78, 0.18, 1)
-    both;
-  transform-origin: center center;
+  animation-name: page-curl-front-forward;
 }
 
 :root[data-page-flip-direction='backward'] .page-leave-active {
-  animation-name: page-content-fold-backward;
-  animation-timing-function: cubic-bezier(0.18, 0.78, 0.18, 1);
-  backface-visibility: hidden;
-  transform-origin: center center;
+  animation-name: page-curl-front-backward;
 }
 
-:root[data-page-flip-direction='backward'] .page-leave-active::after {
-  animation: page-fold-crease var(--page-flip-duration, 180ms) cubic-bezier(0.18, 0.78, 0.18, 1)
-    both;
-  transform-origin: center center;
+.page-turn-target-snapshot,
+.page-turn-back-snapshot,
+.page-turn-crease {
+  box-sizing: border-box;
+  inset: 0 24px auto;
+  min-height: calc(100vh - 96px);
+  pointer-events: none;
+  position: absolute;
+  width: calc(100% - 48px);
+}
+
+.page-turn-target-snapshot,
+.page-turn-back-snapshot {
+  background: var(--paper-background);
+  margin: 0;
+  max-width: none;
+}
+
+.page-turn-target-snapshot {
+  z-index: 1;
+}
+
+.page-turn-back-snapshot {
+  animation-duration: var(--page-flip-duration, 620ms);
+  animation-fill-mode: both;
+  animation-timing-function: cubic-bezier(0.18, 0.78, 0.18, 1);
+  overflow: hidden;
+  will-change: clip-path;
+  z-index: 3;
+}
+
+:root[data-page-flip-direction='forward'] .page-turn-back-snapshot {
+  animation-name: page-curl-back-forward;
+}
+
+:root[data-page-flip-direction='backward'] .page-turn-back-snapshot {
+  animation-name: page-curl-back-backward;
+}
+
+.page-turn-crease {
+  animation-duration: var(--page-flip-duration, 620ms);
+  animation-fill-mode: both;
+  animation-timing-function: cubic-bezier(0.18, 0.78, 0.18, 1);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--page-flip-shadow) 30%,
+    var(--page-flip-crease) 48%,
+    var(--page-flip-highlight) 58%,
+    transparent 78%
+  );
+  border-radius: 48% 52% 46% 54% / 4% 5% 4% 6%;
+  opacity: 0;
+  top: -2%;
+  width: 72px;
+  will-change: left, opacity, transform;
+  z-index: 4;
+}
+
+:root[data-page-flip-direction='forward'] .page-turn-crease {
+  animation-name: page-curl-crease-forward;
+}
+
+:root[data-page-flip-direction='backward'] .page-turn-crease {
+  animation-name: page-curl-crease-backward;
+}
+
+:root[data-page-flip-direction] .page-enter-active {
+  animation: page-turn-target-hold var(--page-flip-duration, 620ms) linear both;
 }
 
 .home-view {
@@ -1714,113 +1742,334 @@ h1 {
   }
 }
 
-@keyframes page-content-fold-forward {
+@keyframes page-curl-front-forward {
   0% {
     opacity: 1;
-    transform: rotateX(0deg) rotateY(0deg) skewY(0deg);
+    clip-path: polygon(
+      0 0,
+      102% 0,
+      100% 17%,
+      103% 35%,
+      99% 53%,
+      102% 71%,
+      100% 86%,
+      102% 100%,
+      0 100%
+    );
   }
 
-  30% {
+  28% {
     opacity: 1;
-    transform: rotateX(0.45deg) rotateY(-48deg) skewY(0.18deg);
+    clip-path: polygon(0 0, 82% 0, 78% 17%, 81% 35%, 76% 53%, 80% 71%, 77% 86%, 82% 100%, 0 100%);
   }
 
-  60% {
+  58% {
     opacity: 1;
-    transform: rotateX(-0.35deg) rotateY(-70deg) skewY(-0.24deg);
+    clip-path: polygon(0 0, 52% 0, 47% 17%, 50% 35%, 44% 53%, 49% 71%, 46% 86%, 52% 100%, 0 100%);
   }
 
-  78% {
+  82% {
     opacity: 1;
-    transform: rotateX(-0.12deg) rotateY(-80deg) skewY(-0.08deg);
+    clip-path: polygon(0 0, 20% 0, 15% 17%, 18% 35%, 12% 53%, 17% 71%, 14% 86%, 20% 100%, 0 100%);
   }
 
-  88% {
-    opacity: 0.52;
-    transform: rotateX(0deg) rotateY(-86deg) skewY(0deg);
+  100% {
+    opacity: 0.18;
+    clip-path: polygon(0 0, -2% 0, -6% 17%, -3% 35%, -8% 53%, -4% 71%, -7% 86%, -2% 100%, 0 100%);
+  }
+}
+
+@keyframes page-curl-front-backward {
+  0% {
+    opacity: 1;
+    clip-path: polygon(-2% 0, 100% 0, 100% 100%, -2% 100%, 0 86%, -3% 71%, 1% 53%, -2% 35%, 0 17%);
+  }
+
+  28% {
+    opacity: 1;
+    clip-path: polygon(
+      18% 0,
+      100% 0,
+      100% 100%,
+      18% 100%,
+      23% 86%,
+      20% 71%,
+      24% 53%,
+      19% 35%,
+      22% 17%
+    );
+  }
+
+  58% {
+    opacity: 1;
+    clip-path: polygon(
+      48% 0,
+      100% 0,
+      100% 100%,
+      48% 100%,
+      54% 86%,
+      51% 71%,
+      56% 53%,
+      50% 35%,
+      53% 17%
+    );
+  }
+
+  82% {
+    opacity: 1;
+    clip-path: polygon(
+      80% 0,
+      100% 0,
+      100% 100%,
+      80% 100%,
+      86% 86%,
+      83% 71%,
+      88% 53%,
+      82% 35%,
+      85% 17%
+    );
+  }
+
+  100% {
+    opacity: 0.18;
+    clip-path: polygon(
+      102% 0,
+      100% 0,
+      100% 100%,
+      102% 100%,
+      107% 86%,
+      104% 71%,
+      108% 53%,
+      103% 35%,
+      106% 17%
+    );
+  }
+}
+
+@keyframes page-curl-back-forward {
+  0% {
+    opacity: 0;
+    clip-path: polygon(
+      100% 0,
+      103% 0,
+      102% 17%,
+      104% 35%,
+      101% 53%,
+      103% 71%,
+      102% 86%,
+      103% 100%,
+      100% 100%,
+      100% 86%,
+      99% 71%,
+      100% 53%,
+      99% 35%,
+      100% 17%
+    );
+  }
+
+  28% {
+    opacity: 0.92;
+    clip-path: polygon(
+      75% 0,
+      86% 0,
+      84% 17%,
+      87% 35%,
+      82% 53%,
+      86% 71%,
+      83% 86%,
+      86% 100%,
+      78% 100%,
+      75% 86%,
+      78% 71%,
+      74% 53%,
+      79% 35%,
+      76% 17%
+    );
+  }
+
+  58% {
+    opacity: 1;
+    clip-path: polygon(
+      43% 0,
+      57% 0,
+      55% 17%,
+      58% 35%,
+      52% 53%,
+      57% 71%,
+      54% 86%,
+      57% 100%,
+      47% 100%,
+      43% 86%,
+      47% 71%,
+      42% 53%,
+      48% 35%,
+      44% 17%
+    );
   }
 
   100% {
     opacity: 0;
-    transform: rotateX(0deg) rotateY(-89.8deg) skewY(0deg);
+    clip-path: polygon(
+      -8% 0,
+      1% 0,
+      -1% 17%,
+      2% 35%,
+      -3% 53%,
+      1% 71%,
+      -2% 86%,
+      1% 100%,
+      -7% 100%,
+      -10% 86%,
+      -7% 71%,
+      -11% 53%,
+      -6% 35%,
+      -9% 17%
+    );
   }
 }
 
-@keyframes page-content-fold-backward {
+@keyframes page-curl-back-backward {
   0% {
-    opacity: 1;
-    transform: rotateX(0deg) rotateY(0deg) skewY(0deg);
+    opacity: 0;
+    clip-path: polygon(
+      -3% 0,
+      0 0,
+      0 17%,
+      1% 35%,
+      0 53%,
+      1% 71%,
+      0 86%,
+      0 100%,
+      -3% 100%,
+      -2% 86%,
+      -3% 71%,
+      -1% 53%,
+      -4% 35%,
+      -2% 17%
+    );
   }
 
-  30% {
-    opacity: 1;
-    transform: rotateX(0.45deg) rotateY(48deg) skewY(-0.18deg);
+  28% {
+    opacity: 0.92;
+    clip-path: polygon(
+      14% 0,
+      25% 0,
+      24% 17%,
+      29% 35%,
+      26% 53%,
+      30% 71%,
+      27% 86%,
+      22% 100%,
+      14% 100%,
+      17% 86%,
+      14% 71%,
+      18% 53%,
+      13% 35%,
+      16% 17%
+    );
   }
 
-  60% {
+  58% {
     opacity: 1;
-    transform: rotateX(-0.35deg) rotateY(70deg) skewY(0.24deg);
-  }
-
-  78% {
-    opacity: 1;
-    transform: rotateX(-0.12deg) rotateY(80deg) skewY(0.08deg);
-  }
-
-  88% {
-    opacity: 0.52;
-    transform: rotateX(0deg) rotateY(86deg) skewY(0deg);
+    clip-path: polygon(
+      43% 0,
+      57% 0,
+      56% 17%,
+      62% 35%,
+      58% 53%,
+      63% 71%,
+      60% 86%,
+      57% 100%,
+      47% 100%,
+      50% 86%,
+      47% 71%,
+      52% 53%,
+      46% 35%,
+      49% 17%
+    );
   }
 
   100% {
     opacity: 0;
-    transform: rotateX(0deg) rotateY(89.8deg) skewY(0deg);
+    clip-path: polygon(
+      99% 0,
+      108% 0,
+      106% 17%,
+      111% 35%,
+      107% 53%,
+      111% 71%,
+      108% 86%,
+      107% 100%,
+      99% 100%,
+      102% 86%,
+      99% 71%,
+      103% 53%,
+      98% 35%,
+      101% 17%
+    );
   }
 }
 
-@keyframes page-content-reveal {
+@keyframes page-curl-crease-forward {
+  0% {
+    left: calc(100% - 72px);
+    opacity: 0;
+    transform: scaleX(0.3) skewY(0deg);
+  }
+
+  18% {
+    opacity: 0.5;
+  }
+
+  58% {
+    left: calc(48% - 36px);
+    opacity: 0.88;
+    transform: scaleX(1) skewY(-0.8deg);
+  }
+
+  84% {
+    opacity: 0.42;
+  }
+
+  100% {
+    left: -36px;
+    opacity: 0;
+    transform: scaleX(0.34) skewY(0deg);
+  }
+}
+
+@keyframes page-curl-crease-backward {
+  0% {
+    left: -36px;
+    opacity: 0;
+    transform: scaleX(0.3) skewY(0deg);
+  }
+
+  18% {
+    opacity: 0.5;
+  }
+
+  58% {
+    left: calc(52% - 36px);
+    opacity: 0.88;
+    transform: scaleX(1) skewY(0.8deg);
+  }
+
+  84% {
+    opacity: 0.42;
+  }
+
+  100% {
+    left: calc(100% - 36px);
+    opacity: 0;
+    transform: scaleX(0.34) skewY(0deg);
+  }
+}
+
+@keyframes page-turn-target-hold {
   0%,
-  30% {
-    opacity: 0;
-  }
-
-  40% {
-    opacity: 0.24;
-  }
-
-  60% {
-    opacity: 0.9;
-  }
-
-  100% {
-    opacity: 1;
-  }
-}
-
-@keyframes page-fold-crease {
-  0% {
-    opacity: 0;
-    transform: scaleX(0.5);
-  }
-
-  24% {
-    opacity: 0.2;
-    transform: scaleX(0.72);
-  }
-
-  52% {
-    opacity: 0.56;
-    transform: scaleX(1);
-  }
-
-  78% {
-    opacity: 0.24;
-    transform: scaleX(0.68);
-  }
-
   100% {
     opacity: 0;
-    transform: scaleX(0.45);
   }
 }
 
@@ -1924,9 +2173,12 @@ h1 {
     padding: 0 16px 40px;
   }
 
-  .page-leave-active::after {
-    left: calc(50% - 28px);
-    width: 56px;
+  .page-leave-active,
+  .page-turn-target-snapshot,
+  .page-turn-back-snapshot,
+  .page-turn-crease {
+    inset-inline: 16px;
+    width: calc(100% - 32px);
   }
 
   .home-view {
@@ -2080,27 +2332,37 @@ h1 {
     animation: page-fade-out 120ms ease-out both !important;
   }
 
-  :root:not([data-page-flip-direction]) .page-leave-active::after {
-    animation: none !important;
-    opacity: 0 !important;
-  }
-
   :root[data-page-flip-direction] .page-enter-active {
-    animation: page-content-reveal var(--page-flip-duration, 620ms) linear both !important;
+    animation: page-turn-target-hold var(--page-flip-duration, 620ms) linear both !important;
   }
 
   :root[data-page-flip-direction='forward'] .page-leave-active {
-    animation: page-content-fold-forward var(--page-flip-duration, 620ms)
+    animation: page-curl-front-forward var(--page-flip-duration, 620ms)
       cubic-bezier(0.18, 0.78, 0.18, 1) both !important;
   }
 
   :root[data-page-flip-direction='backward'] .page-leave-active {
-    animation: page-content-fold-backward var(--page-flip-duration, 620ms)
+    animation: page-curl-front-backward var(--page-flip-duration, 620ms)
       cubic-bezier(0.18, 0.78, 0.18, 1) both !important;
   }
 
-  :root[data-page-flip-direction] .page-leave-active::after {
-    animation: page-fold-crease var(--page-flip-duration, 620ms) cubic-bezier(0.18, 0.78, 0.18, 1)
-      both !important;
+  :root[data-page-flip-direction='forward'] .page-turn-back-snapshot {
+    animation: page-curl-back-forward var(--page-flip-duration, 620ms)
+      cubic-bezier(0.18, 0.78, 0.18, 1) both !important;
+  }
+
+  :root[data-page-flip-direction='backward'] .page-turn-back-snapshot {
+    animation: page-curl-back-backward var(--page-flip-duration, 620ms)
+      cubic-bezier(0.18, 0.78, 0.18, 1) both !important;
+  }
+
+  :root[data-page-flip-direction='forward'] .page-turn-crease {
+    animation: page-curl-crease-forward var(--page-flip-duration, 620ms)
+      cubic-bezier(0.18, 0.78, 0.18, 1) both !important;
+  }
+
+  :root[data-page-flip-direction='backward'] .page-turn-crease {
+    animation: page-curl-crease-backward var(--page-flip-duration, 620ms)
+      cubic-bezier(0.18, 0.78, 0.18, 1) both !important;
   }
 }
