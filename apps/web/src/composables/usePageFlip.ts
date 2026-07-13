@@ -1,6 +1,6 @@
 type PageFlipDirection = 'backward' | 'forward';
 
-const pageFlipDuration = 980;
+const pageFlipDuration = 820;
 const pageSnapshotQuietPeriod = 120;
 const pageSnapshotMaxWait = 900;
 
@@ -141,7 +141,6 @@ function createPageFlipOverlay(source: HTMLElement, direction: PageFlipDirection
   const targetLayer = document.createElement('div');
   const stage = document.createElement('div');
   const staticHalf = document.createElement('div');
-  const underShadow = document.createElement('div');
   const sheet = document.createElement('div');
   const front = document.createElement('div');
   const back = document.createElement('div');
@@ -150,7 +149,6 @@ function createPageFlipOverlay(source: HTMLElement, direction: PageFlipDirection
   stage.className = 'book-flip-stage';
   targetLayer.className = 'book-flip-target';
   staticHalf.className = 'book-flip-static';
-  underShadow.className = 'book-flip-under-shadow';
   sheet.className = 'book-flip-sheet';
   front.className = 'book-flip-face book-flip-front';
   back.className = 'book-flip-face book-flip-back';
@@ -159,7 +157,7 @@ function createPageFlipOverlay(source: HTMLElement, direction: PageFlipDirection
   staticHalf.append(createPageCopy(source, 'book-flip-static-copy', overlay));
   front.append(createPageCopy(source, 'book-flip-front-copy', overlay));
   sheet.append(front, back);
-  stage.append(targetLayer, staticHalf, underShadow, sheet, spine);
+  stage.append(targetLayer, staticHalf, sheet, spine);
   overlay.append(stage);
 
   return overlay;

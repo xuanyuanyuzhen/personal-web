@@ -54,7 +54,7 @@ describe('route page flip', () => {
     expect(overlay?.querySelector('.book-flip-target-copy')?.textContent).not.toContain(
       'Changed after snapshot',
     );
-    expect(document.documentElement.style.getPropertyValue('--page-flip-duration')).toBe('980ms');
+    expect(document.documentElement.style.getPropertyValue('--page-flip-duration')).toBe('820ms');
 
     vi.advanceTimersByTime(1260);
 
