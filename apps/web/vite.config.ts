@@ -11,6 +11,10 @@ export default defineConfig({
         changeOrigin: true,
         target: 'http://127.0.0.1:3000',
       },
+      '/uploads': {
+        changeOrigin: true,
+        target: 'http://127.0.0.1:3000',
+      },
     },
   },
   preview: {

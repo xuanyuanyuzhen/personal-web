@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
+import PageLoadingSkeleton from '../components/PageLoadingSkeleton.vue';
 import { useI18n } from '../composables/useI18n';
 import { publicApi, type SearchResponse, type SearchSectionKey } from '../services/api';
 
@@ -8,10 +9,12 @@ const route = useRoute();
 const router = useRouter();
 const { t } = useI18n();
 
-const queryInput = ref('');
+const initialQuery = typeof route.query.q === 'string' ? route.query.q : '';
+const queryInput = ref(initialQuery);
 const result = ref<SearchResponse | null>(null);
-const isLoading = ref(false);
+const isLoading = ref(Boolean(initialQuery.trim()));
 const errorMessage = ref('');
+let requestSequence = 0;
 
 const sectionOrder: SearchSectionKey[] = ['thoughts', 'pages', 'essays', 'photos', 'messages'];
 const visibleSections = computed(() =>
@@ -51,10 +54,12 @@ async function submitSearch() {
 }
 
 async function loadResults() {
+  const requestId = ++requestSequence;
   const keyword = queryInput.value.trim();
   if (!keyword) {
     result.value = null;
     errorMessage.value = '';
+    isLoading.value = false;
     return;
   }
 
@@ -62,16 +67,23 @@ async function loadResults() {
   errorMessage.value = '';
 
   try {
-    result.value = await publicApi.search({
+    const nextResult = await publicApi.search({
       page: 1,
       pageSize: 10,
       q: keyword,
     });
+    if (requestId === requestSequence) {
+      result.value = nextResult;
+    }
   } catch {
-    result.value = null;
-    errorMessage.value = t('search.error');
+    if (requestId === requestSequence) {
+      result.value = null;
+      errorMessage.value = t('search.error');
+    }
   } finally {
-    isLoading.value = false;
+    if (requestId === requestSequence) {
+      isLoading.value = false;
+    }
   }
 }
 </script>
@@ -109,12 +121,11 @@ async function loadResults() {
       </button>
     </form>
 
-    <p
+    <PageLoadingSkeleton
       v-if="isLoading"
-      class="search-dialog-status"
-    >
-      {{ t('loading.label') }}
-    </p>
+      variant="search"
+      label="正在搜索…"
+    />
     <p
       v-else-if="errorMessage"
       class="search-dialog-status"

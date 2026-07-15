@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from 'vue';
-import HeartLikeButton from '../components/HeartLikeButton.vue';
+import InteractivePhotoCanvas from '../components/InteractivePhotoCanvas.vue';
+import PageLoadingSkeleton from '../components/PageLoadingSkeleton.vue';
 import { useI18n } from '../composables/useI18n';
 import { publicApi, type PublicAlbum, type PublicPhoto } from '../services/api';
 
@@ -12,9 +13,11 @@ const albums = ref<PublicAlbum[]>([]);
 const photos = ref<PublicPhoto[]>([]);
 const activeAlbumId = ref<number | null>(null);
 const isLoading = ref(false);
+const initialLoadPending = ref(true);
 const errorMessage = ref('');
 const previewPhoto = ref<PublicPhoto | null>(null);
 const transitionPhotoId = ref<number | null>(null);
+let requestSequence = 0;
 
 const hasMore = computed(() => photos.value.length < total.value);
 
@@ -31,34 +34,46 @@ async function loadAlbums() {
 }
 
 async function loadFirstPage() {
+  const requestId = ++requestSequence;
+  initialLoadPending.value = true;
   page.value = 1;
   photos.value = [];
   total.value = 0;
-  await loadMore();
+  await loadMore(requestId, true);
 }
 
-async function loadMore() {
-  if (isLoading.value) {
+async function loadMore(requestId = requestSequence, force = false) {
+  if (isLoading.value && !force) {
     return;
   }
 
   isLoading.value = true;
   errorMessage.value = '';
+  const requestedAlbumId = activeAlbumId.value;
+  const requestedPage = page.value;
 
   try {
     const result = await publicApi.listPhotos({
-      albumId: activeAlbumId.value ?? undefined,
-      page: page.value,
+      albumId: requestedAlbumId ?? undefined,
+      page: requestedPage,
       pageSize,
     });
+    if (requestId !== requestSequence) {
+      return;
+    }
     const seen = new Set(photos.value.map((photo) => photo.id));
     photos.value = [...photos.value, ...result.items.filter((photo) => !seen.has(photo.id))];
     total.value = result.pagination.total;
-    page.value += 1;
+    page.value = requestedPage + 1;
   } catch {
-    errorMessage.value = '照片加载失败，请稍后重试。';
+    if (requestId === requestSequence) {
+      errorMessage.value = '照片加载失败，请稍后重试。';
+    }
   } finally {
-    isLoading.value = false;
+    if (requestId === requestSequence) {
+      isLoading.value = false;
+      initialLoadPending.value = false;
+    }
   }
 }
 
@@ -77,12 +92,6 @@ async function toggleLike(photo: PublicPhoto) {
   }
 }
 
-function thumbnailTransitionName(photo: PublicPhoto) {
-  return transitionPhotoId.value === photo.id && previewPhoto.value === null
-    ? 'photo-preview'
-    : 'none';
-}
-
 function previewTransitionName(photo: PublicPhoto | null) {
   return photo && transitionPhotoId.value === photo.id && previewPhoto.value !== null
     ? 'photo-preview'
@@ -90,18 +99,16 @@ function previewTransitionName(photo: PublicPhoto | null) {
 }
 
 async function runPhotoViewTransition(update: () => Promise<void>) {
-  const startViewTransition = (
-    document as Document & {
-      startViewTransition?: (callback: () => Promise<void>) => { finished?: Promise<unknown> };
-    }
-  ).startViewTransition;
+  const viewTransitionDocument = document as Document & {
+    startViewTransition?: (callback: () => Promise<void>) => { finished?: Promise<unknown> };
+  };
 
-  if (!startViewTransition) {
+  if (!viewTransitionDocument.startViewTransition) {
     await update();
     return;
   }
 
-  const transition = startViewTransition(update);
+  const transition = viewTransitionDocument.startViewTransition(update);
   await transition.finished?.catch(() => undefined);
 }
 
@@ -173,39 +180,23 @@ async function closePreview() {
         {{ errorMessage }}
       </p>
 
-      <div class="photo-wall">
-        <article
-          v-for="photo in photos"
-          :key="photo.id"
-          class="photo-tile"
-        >
-          <button
-            type="button"
-            class="photo-preview-button"
-            @click="openPreview(photo)"
-          >
-            <img
-              :src="photo.thumbUrl || photo.largeUrl || photo.originalUrl"
-              :alt="photo.title"
-              :style="{ viewTransitionName: thumbnailTransitionName(photo) }"
-            >
-          </button>
-          <div class="photo-tile-caption">
-            <div>
-              <strong>{{ photo.title }}</strong>
-              <span>{{ photo.album?.name ?? '未分组' }}</span>
-            </div>
-            <HeartLikeButton
-              :liked="photo.liked"
-              :like-count="photo.likeCount"
-              @toggle="toggleLike(photo)"
-            />
-          </div>
-        </article>
-      </div>
+      <PageLoadingSkeleton
+        v-if="initialLoadPending && photos.length === 0"
+        variant="photos"
+        label="正在装裱照片…"
+      />
+
+      <InteractivePhotoCanvas
+        v-if="photos.length"
+        :photos="photos"
+        :preview-open="previewPhoto !== null"
+        :transition-photo-id="transitionPhotoId"
+        @preview="openPreview"
+        @toggle-like="toggleLike"
+      />
 
       <div
-        v-if="!isLoading && photos.length === 0"
+        v-if="!initialLoadPending && !isLoading && photos.length === 0"
         class="empty-state"
       >
         暂无公开照片。
@@ -216,7 +207,7 @@ async function closePreview() {
         class="load-more"
         type="button"
         :disabled="isLoading"
-        @click="loadMore"
+        @click="loadMore()"
       >
         {{ isLoading ? '加载中' : '加载更多' }}
       </button>

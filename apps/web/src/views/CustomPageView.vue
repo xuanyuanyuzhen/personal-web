@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
+import PageLoadingSkeleton from '../components/PageLoadingSkeleton.vue';
 import { useI18n } from '../composables/useI18n';
 import { publicApi } from '../services/api';
 
@@ -10,6 +11,7 @@ const { t } = useI18n();
 const page = ref(null);
 const isLoading = ref(false);
 const hasError = ref(false);
+let requestSequence = 0;
 
 const slug = computed(() => String(route.params.slug ?? ''));
 
@@ -22,9 +24,11 @@ watch(
 );
 
 async function loadPage() {
+  const requestId = ++requestSequence;
   if (!slug.value) {
     page.value = null;
     hasError.value = true;
+    isLoading.value = false;
     return;
   }
 
@@ -32,12 +36,19 @@ async function loadPage() {
   hasError.value = false;
 
   try {
-    page.value = await publicApi.getPageBySlug(slug.value);
+    const nextPage = await publicApi.getPageBySlug(slug.value);
+    if (requestId === requestSequence) {
+      page.value = nextPage;
+    }
   } catch {
-    page.value = null;
-    hasError.value = true;
+    if (requestId === requestSequence) {
+      page.value = null;
+      hasError.value = true;
+    }
   } finally {
-    isLoading.value = false;
+    if (requestId === requestSequence) {
+      isLoading.value = false;
+    }
   }
 }
 </script>
@@ -55,14 +66,10 @@ async function loadPage() {
     <h1 id="custom-page-loading-title">
       {{ t('loading.label') }}
     </h1>
-    <div
-      class="page-placeholder-skeleton"
-      aria-hidden="true"
-    >
-      <span />
-      <span />
-      <span />
-    </div>
+    <PageLoadingSkeleton
+      variant="article"
+      :label="t('loading.label')"
+    />
   </section>
 
   <section

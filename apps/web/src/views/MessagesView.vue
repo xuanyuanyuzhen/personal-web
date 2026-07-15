@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
+import PageLoadingSkeleton from '../components/PageLoadingSkeleton.vue';
 import { useI18n } from '../composables/useI18n';
 import { publicApi, type PublicMessage } from '../services/api';
 
@@ -9,12 +10,14 @@ const pageSize = 12;
 const total = ref(0);
 const messages = ref<PublicMessage[]>([]);
 const isLoading = ref(false);
+const initialLoadPending = ref(true);
 const isSubmitting = ref(false);
 const errorMessage = ref('');
 const submitMessage = ref('');
 const loadMoreSentinel = ref<HTMLElement | null>(null);
 const supportsAutoLoad = ref(false);
 let loadMoreObserver: IntersectionObserver | null = null;
+let requestSequence = 0;
 const form = reactive({
   content: '',
   email: '',
@@ -33,21 +36,27 @@ onBeforeUnmount(() => {
 });
 
 async function loadFirstPage() {
+  const requestId = ++requestSequence;
+  initialLoadPending.value = true;
   page.value = 1;
   messages.value = [];
   total.value = 0;
-  await loadMore();
+  await loadMore(requestId, true);
 }
 
-async function loadMore() {
-  if (isLoading.value || (messages.value.length > 0 && !hasMore.value)) {
+async function loadMore(requestId = requestSequence, force = false) {
+  if ((!force && isLoading.value) || (messages.value.length > 0 && !hasMore.value)) {
     return;
   }
 
   isLoading.value = true;
   errorMessage.value = '';
+  const requestedPage = page.value;
   try {
-    const result = await publicApi.listMessages({ page: page.value, pageSize });
+    const result = await publicApi.listMessages({ page: requestedPage, pageSize });
+    if (requestId !== requestSequence) {
+      return;
+    }
     // 滚动加载可能和手动刷新交错，按 id 去重可以避免重复渲染同一条留言。
     const seen = new Set(messages.value.map((message) => message.id));
     messages.value = [
@@ -55,11 +64,16 @@ async function loadMore() {
       ...result.items.filter((message) => !seen.has(message.id)),
     ];
     total.value = result.pagination.total;
-    page.value += 1;
+    page.value = requestedPage + 1;
   } catch {
-    errorMessage.value = '留言加载失败，请稍后重试。';
+    if (requestId === requestSequence) {
+      errorMessage.value = '留言加载失败，请稍后重试。';
+    }
   } finally {
-    isLoading.value = false;
+    if (requestId === requestSequence) {
+      isLoading.value = false;
+      initialLoadPending.value = false;
+    }
   }
 }
 
@@ -187,7 +201,16 @@ function avatarText(message: PublicMessage) {
       </div>
     </form>
 
-    <div class="message-list">
+    <PageLoadingSkeleton
+      v-if="initialLoadPending && messages.length === 0"
+      variant="messages"
+      label="正在读取留言…"
+    />
+
+    <div
+      v-else
+      class="message-list"
+    >
       <article
         v-for="message in messages"
         :key="message.id"
@@ -214,7 +237,7 @@ function avatarText(message: PublicMessage) {
     </div>
 
     <div
-      v-if="!isLoading && messages.length === 0"
+      v-if="!initialLoadPending && !isLoading && messages.length === 0"
       class="empty-state"
     >
       暂无公开留言。
@@ -232,7 +255,7 @@ function avatarText(message: PublicMessage) {
       type="button"
       :disabled="isLoading"
       :hidden="supportsAutoLoad"
-      @click="loadMore"
+      @click="loadMore()"
     >
       {{ isLoading ? '加载中' : '加载更多' }}
     </button>

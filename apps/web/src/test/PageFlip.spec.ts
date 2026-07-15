@@ -23,7 +23,7 @@ describe('route page flip', () => {
     expect(document.documentElement.dataset.pageFlipDirection).toBe('forward');
 
     armRoutePageFlipCleanup();
-    vi.advanceTimersByTime(1119);
+    vi.advanceTimersByTime(739);
     expect(document.documentElement.dataset.pageFlipDirection).toBe('forward');
 
     vi.advanceTimersByTime(1);
@@ -48,10 +48,24 @@ describe('route page flip', () => {
     startRoutePageFlip({ name: 'thoughts', path: '/thoughts' }, { name: 'home', path: '/' });
     armRoutePageFlipCleanup();
 
-    vi.advanceTimersByTime(819);
+    vi.advanceTimersByTime(739);
     expect(document.documentElement.dataset.pageFlipDirection).toBe('backward');
 
-    vi.advanceTimersByTime(301);
+    vi.advanceTimersByTime(1);
     expect(document.documentElement.dataset.pageFlipDirection).toBeUndefined();
+  });
+
+  it('stops a stale animation when the next route does not require a page turn', () => {
+    startRoutePageFlip({ name: 'home', path: '/' }, { name: 'essays', path: '/essays' });
+
+    expect(document.documentElement.dataset.pageFlipDirection).toBe('forward');
+
+    startRoutePageFlip(
+      { name: 'essays', path: '/essays' },
+      { name: 'essay-detail', path: '/essays/entry' },
+    );
+
+    expect(document.documentElement.dataset.pageFlipDirection).toBeUndefined();
+    expect(document.documentElement.style.getPropertyValue('--page-flip-duration')).toBe('');
   });
 });

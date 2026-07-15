@@ -55,6 +55,19 @@ describe('HomeView', () => {
     vi.unstubAllGlobals();
   });
 
+  it('renders meaningful local defaults without waiting for home APIs', () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise<Response>(() => undefined)),
+    );
+
+    const wrapper = mount(HomeView);
+
+    expect(wrapper.get('h1').text().trim()).not.toBe('');
+    expect(wrapper.get('.summary').text().trim()).not.toBe('');
+    expect(wrapper.find('.heart-like-button').exists()).toBe(true);
+  });
+
   it('renders site settings and announcement from the API', async () => {
     const wrapper = mount(HomeView);
     await flushPromises();

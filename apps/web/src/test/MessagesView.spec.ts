@@ -24,19 +24,46 @@ describe('MessagesView', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn((input: URL | RequestInfo, init?: RequestInit) => {
-        const url = typeof input === 'string' ? input : input instanceof URL ? input.pathname + input.search : input.url;
+        const url =
+          typeof input === 'string'
+            ? input
+            : input instanceof URL
+              ? input.pathname + input.search
+              : input.url;
 
         if (url === '/api/messages' && init?.method === 'POST') {
-          return Promise.resolve(jsonResponse({ ...message(2, '新留言'), auditStatus: 'APPROVED' }));
+          return Promise.resolve(
+            jsonResponse({ ...message(2, '新留言'), auditStatus: 'APPROVED' }),
+          );
         }
 
-        return Promise.resolve(jsonResponse({ items: [message(1, '第一条留言')], pagination: { page: 1, pageSize: 12, total: 1 } }));
+        return Promise.resolve(
+          jsonResponse({
+            items: [message(1, '第一条留言')],
+            pagination: { page: 1, pageSize: 12, total: 1 },
+          }),
+        );
       }),
     );
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('keeps the message form and a list skeleton visible during the first request', () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise<Response>(() => undefined)),
+    );
+
+    const wrapper = mount(MessagesView);
+
+    expect(wrapper.find('.message-form').exists()).toBe(true);
+    expect(wrapper.get('.content-skeleton-messages').attributes('aria-label')).toBe(
+      '正在读取留言…',
+    );
+    expect(wrapper.find('.empty-state').exists()).toBe(false);
   });
 
   it('loads public messages and submits a new message', async () => {
@@ -51,7 +78,10 @@ describe('MessagesView', () => {
     await wrapper.get('form').trigger('submit');
     await flushPromises();
 
-    expect(fetch).toHaveBeenCalledWith('/api/messages', expect.objectContaining({ method: 'POST' }));
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/messages',
+      expect.objectContaining({ method: 'POST' }),
+    );
     expect(wrapper.text()).toContain('留言已公开');
   });
 });

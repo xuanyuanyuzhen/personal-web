@@ -32,10 +32,17 @@ describe('ThoughtsView', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn((input: URL | RequestInfo) => {
-        const url = typeof input === 'string' ? input : input instanceof URL ? input.pathname + input.search : input.url;
+        const url =
+          typeof input === 'string'
+            ? input
+            : input instanceof URL
+              ? input.pathname + input.search
+              : input.url;
 
         if (url === '/api/thoughts/tags/public') {
-          return Promise.resolve(jsonResponse([{ color: null, id: 1, name: '日常', slug: 'daily' }]));
+          return Promise.resolve(
+            jsonResponse([{ color: null, id: 1, name: '日常', slug: 'daily' }]),
+          );
         }
 
         if (url.startsWith('/api/thoughts/public/1/like')) {
@@ -74,6 +81,20 @@ describe('ThoughtsView', () => {
     vi.unstubAllGlobals();
   });
 
+  it('shows a stable first-screen skeleton before thoughts arrive', () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise<Response>(() => undefined)),
+    );
+
+    const wrapper = mount(ThoughtsView);
+
+    expect(wrapper.get('.content-skeleton-thoughts').attributes('aria-label')).toBe(
+      '正在整理碎碎念…',
+    );
+    expect(wrapper.find('.empty-state').exists()).toBe(false);
+  });
+
   it('filters by tag, deduplicates loaded items, and toggles likes', async () => {
     const wrapper = mount(ThoughtsView);
     await flushPromises();
@@ -89,7 +110,10 @@ describe('ThoughtsView', () => {
     await flushPromises();
     expect(wrapper.text()).toContain('已喜欢 · 3');
 
-    await wrapper.findAll('.thought-filter button').find((button) => button.text() === '日常')?.trigger('click');
+    await wrapper
+      .findAll('.thought-filter button')
+      .find((button) => button.text() === '日常')
+      ?.trigger('click');
     await flushPromises();
     expect(wrapper.text()).toContain('筛选结果');
     expect(fetch).toHaveBeenCalledWith(expect.stringContaining('tag=daily'), expect.any(Object));

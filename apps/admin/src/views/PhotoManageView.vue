@@ -252,7 +252,7 @@
       v-model="photoDialogOpen"
       :title="editingPhoto ? '编辑照片' : '新增照片'"
       width="720px"
-      :close-on-click-modal="!saving"
+      :close-on-click-modal="!saving && !dialogUploading"
       :teleported="false"
     >
       <el-alert
@@ -298,6 +298,30 @@
             :rows="2"
             resize="vertical"
           />
+        </el-form-item>
+        <el-form-item label="图片文件">
+          <div class="photo-dialog-upload">
+            <input
+              ref="dialogPhotoInputRef"
+              class="visually-hidden"
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              @change="handleDialogPhotoSelected"
+            >
+            <el-button
+              :loading="dialogUploading"
+              @click="dialogPhotoInputRef?.click()"
+            >
+              选择图片并上传
+            </el-button>
+            <span>{{ selectedPhotoName || '支持 JPG、PNG、WebP、GIF，最大 10MB' }}</span>
+          </div>
+          <img
+            v-if="photoForm.thumbUrl || photoForm.largeUrl || photoForm.originalUrl"
+            class="photo-dialog-preview"
+            :src="photoForm.thumbUrl || photoForm.largeUrl || photoForm.originalUrl"
+            alt="照片预览"
+          >
         </el-form-item>
         <div class="form-grid two-columns">
           <el-form-item label="状态">
@@ -357,7 +381,7 @@
       </el-form>
       <template #footer>
         <el-button
-          :disabled="saving"
+          :disabled="saving || dialogUploading"
           @click="photoDialogOpen = false"
         >
           取消
@@ -365,6 +389,7 @@
         <el-button
           type="primary"
           :loading="saving"
+          :disabled="dialogUploading"
           @click="handleSubmitPhoto"
         >
           保存
@@ -503,6 +528,7 @@ const loading = ref(false);
 const saving = ref(false);
 const sorting = ref(false);
 const uploading = ref(false);
+const dialogUploading = ref(false);
 const albumLoading = ref(false);
 const albumSaving = ref(false);
 const photoDialogOpen = ref(false);
@@ -520,13 +546,15 @@ const editingAlbum = ref<AlbumItem | null>(null);
 const photoFormRef = ref();
 const albumFormRef = ref();
 const photoInputRef = ref<HTMLInputElement | null>(null);
+const dialogPhotoInputRef = ref<HTMLInputElement | null>(null);
+const selectedPhotoName = ref('');
 const pagination = reactive({ page: 1, pageSize: 10, total: 0 });
 const photoForm = reactive<PhotoForm>(createDefaultPhotoForm());
 const albumForm = reactive<AlbumForm>(createDefaultAlbumForm());
 const enabledAlbums = computed(() => albumOptions.value.filter((album) => album.isEnabled));
 
 const photoRules = {
-  originalUrl: [{ required: true, message: '请输入原图地址', trigger: 'blur' }],
+  originalUrl: [{ required: true, message: '请上传图片或填写原图地址', trigger: 'blur' }],
   title: [{ required: true, message: '请输入照片标题', trigger: 'blur' }],
 };
 const albumRules = {
@@ -568,7 +596,11 @@ function createDefaultAlbumForm(): AlbumForm {
 async function loadPhotos() {
   loading.value = true;
   try {
-    const result = await listPhotos({ page: pagination.page, pageSize: pagination.pageSize, search: activeSearch.value });
+    const result = await listPhotos({
+      page: pagination.page,
+      pageSize: pagination.pageSize,
+      search: activeSearch.value,
+    });
     photos.value = result.items;
     pagination.total = result.pagination.total;
   } finally {
@@ -579,7 +611,10 @@ async function loadPhotos() {
 async function loadAlbums() {
   albumLoading.value = true;
   try {
-    const result = await listAlbums({ page: albumPagination.page, pageSize: albumPagination.pageSize });
+    const result = await listAlbums({
+      page: albumPagination.page,
+      pageSize: albumPagination.pageSize,
+    });
     albums.value = result.items;
     albumPagination.total = result.pagination.total;
   } finally {
@@ -588,7 +623,7 @@ async function loadAlbums() {
 }
 
 async function loadAlbumOptions() {
-  const result = await listAlbums({ page: 1, pageSize: 1000 });
+  const result = await listAlbums({ page: 1, pageSize: 100 });
   albumOptions.value = result.items;
 }
 
@@ -644,7 +679,10 @@ async function handlePhotoDrop(target: PhotoItem) {
   nextPhotos.splice(targetIndex, 0, movedPhoto);
 
   const startOrder = (pagination.page - 1) * pagination.pageSize;
-  const orderedPhotos = nextPhotos.map((photo, index) => ({ ...photo, sortOrder: startOrder + index }));
+  const orderedPhotos = nextPhotos.map((photo, index) => ({
+    ...photo,
+    sortOrder: startOrder + index,
+  }));
   photos.value = orderedPhotos;
   sorting.value = true;
 
@@ -685,12 +723,14 @@ function resetAlbumForm(next: AlbumForm) {
 
 function openCreatePhotoDialog() {
   editingPhoto.value = null;
+  selectedPhotoName.value = '';
   resetPhotoForm(createDefaultPhotoForm());
   photoDialogOpen.value = true;
 }
 
 function openEditPhotoDialog(item: PhotoItem) {
   editingPhoto.value = item;
+  selectedPhotoName.value = '';
   resetPhotoForm({
     albumId: item.albumId,
     description: item.description ?? '',
@@ -837,6 +877,36 @@ async function handleFilesSelected(event: Event) {
   }
 }
 
+async function handleDialogPhotoSelected(event: Event) {
+  const input = event.target instanceof HTMLInputElement ? event.target : null;
+  const file = input?.files?.[0];
+  if (!file) {
+    return;
+  }
+
+  dialogUploading.value = true;
+  errorMessage.value = '';
+  try {
+    const upload = await uploadPhotoFile(file);
+    photoForm.originalUrl = upload.original.url;
+    photoForm.largeUrl = upload.large.url;
+    photoForm.thumbUrl = upload.thumb.url;
+    selectedPhotoName.value = file.name;
+    if (!photoForm.title.trim()) {
+      photoForm.title = file.name.replace(/\.[^.]+$/, '') || file.name;
+    }
+    photoFormRef.value?.clearValidate?.('originalUrl');
+    ElMessage.success('图片上传成功，保存后发布到照片墙');
+  } catch (error) {
+    errorMessage.value = error instanceof ApiError ? error.message : '图片上传失败，请稍后重试';
+  } finally {
+    dialogUploading.value = false;
+    if (input) {
+      input.value = '';
+    }
+  }
+}
+
 async function confirmDeletePhoto(item: PhotoItem) {
   await ElMessageBox.confirm('确认删除这张照片？删除后会进入回收站。', '删除确认', {
     cancelButtonText: '取消',
@@ -862,6 +932,7 @@ async function confirmDisableAlbum(item: AlbumItem) {
 defineExpose({
   albumForm,
   handleFilesSelected,
+  handleDialogPhotoSelected,
   handleSubmitAlbum,
   handleSubmitPhoto,
   openCreateAlbumDialog,

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import HeartLikeButton from '../components/HeartLikeButton.vue';
+import PageLoadingSkeleton from '../components/PageLoadingSkeleton.vue';
 import { useI18n } from '../composables/useI18n';
 import { publicApi, type PublicThought, type PublicThoughtTag } from '../services/api';
 
@@ -12,7 +13,9 @@ const items = ref<PublicThought[]>([]);
 const tags = ref<PublicThoughtTag[]>([]);
 const activeTag = ref('');
 const isLoading = ref(false);
+const initialLoadPending = ref(true);
 const errorMessage = ref('');
+let requestSequence = 0;
 
 const hasMore = computed(() => items.value.length < total.value);
 
@@ -34,36 +37,48 @@ async function loadTags() {
 }
 
 async function loadFirstPage() {
+  const requestId = ++requestSequence;
+  initialLoadPending.value = true;
   page.value = 1;
   items.value = [];
   total.value = 0;
-  await loadMore();
+  await loadMore(requestId, true);
 }
 
-async function loadMore() {
-  if (isLoading.value) {
+async function loadMore(requestId = requestSequence, force = false) {
+  if (isLoading.value && !force) {
     return;
   }
 
   isLoading.value = true;
   errorMessage.value = '';
+  const requestedPage = page.value;
+  const requestedTag = activeTag.value;
 
   try {
     const result = await publicApi.listThoughts({
-      page: page.value,
+      page: requestedPage,
       pageSize,
-      tag: activeTag.value || undefined,
+      tag: requestedTag || undefined,
     });
+    if (requestId !== requestSequence) {
+      return;
+    }
     const seen = new Set(items.value.map((item) => item.id));
     const nextItems = result.items.filter((item) => !seen.has(item.id));
 
     items.value = [...items.value, ...nextItems];
     total.value = result.pagination.total;
-    page.value += 1;
+    page.value = requestedPage + 1;
   } catch {
-    errorMessage.value = '碎碎念加载失败，请稍后重试。';
+    if (requestId === requestSequence) {
+      errorMessage.value = '碎碎念加载失败，请稍后重试。';
+    }
   } finally {
-    isLoading.value = false;
+    if (requestId === requestSequence) {
+      isLoading.value = false;
+      initialLoadPending.value = false;
+    }
   }
 }
 
@@ -134,7 +149,16 @@ function handleScroll() {
       {{ errorMessage }}
     </p>
 
-    <div class="thought-list">
+    <PageLoadingSkeleton
+      v-if="initialLoadPending && items.length === 0"
+      variant="thoughts"
+      label="正在整理碎碎念…"
+    />
+
+    <div
+      v-else
+      class="thought-list"
+    >
       <article
         v-for="item in items"
         :key="item.id"
@@ -171,7 +195,7 @@ function handleScroll() {
     </div>
 
     <div
-      v-if="!isLoading && items.length === 0"
+      v-if="!initialLoadPending && !isLoading && items.length === 0"
       class="empty-state"
     >
       暂无公开碎碎念。
@@ -182,7 +206,7 @@ function handleScroll() {
       class="load-more"
       type="button"
       :disabled="isLoading"
-      @click="loadMore"
+      @click="loadMore()"
     >
       {{ isLoading ? '加载中' : '加载更多' }}
     </button>

@@ -89,6 +89,52 @@ describe('Search UI', () => {
     vi.unstubAllGlobals();
   });
 
+  it('uses result-shaped placeholders while quick search is pending', async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { component: { template: '<div />' }, path: '/' },
+        { component: { template: '<div />' }, name: 'search', path: '/search' },
+      ],
+    });
+    await router.push('/');
+    await router.isReady();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise<Response>(() => undefined)),
+    );
+
+    const wrapper = mount(SearchDialog, {
+      global: { plugins: [router] },
+      props: { open: true },
+    });
+    await wrapper.get('input[type="search"]').setValue('春日');
+    await wrapper.get('form').trigger('submit');
+
+    expect(wrapper.get('.content-skeleton-search').attributes('aria-label')).toBe('正在搜索…');
+    expect(wrapper.findAll('.content-skeleton-item')).toHaveLength(2);
+  });
+
+  it('shows a stable results skeleton immediately for a routed query', async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ component: SearchResultsView, name: 'search', path: '/search' }],
+    });
+    await router.push('/search?q=春日');
+    await router.isReady();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise<Response>(() => undefined)),
+    );
+
+    const wrapper = mount(SearchResultsView, {
+      global: { plugins: [router] },
+    });
+
+    expect(wrapper.find('.content-skeleton-search').exists()).toBe(true);
+    expect(wrapper.find('.search-empty').exists()).toBe(false);
+  });
+
   it('shows quick sectioned results and links to the full result page', async () => {
     const router = createRouter({
       history: createMemoryHistory(),

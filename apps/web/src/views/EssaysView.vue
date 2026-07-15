@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import HeartLikeButton from '../components/HeartLikeButton.vue';
+import PageLoadingSkeleton from '../components/PageLoadingSkeleton.vue';
 import { useI18n } from '../composables/useI18n';
 import { publicApi, type PublicEssay, type PublicEssayCategory } from '../services/api';
 
@@ -13,7 +14,9 @@ const items = ref<PublicEssay[]>([]);
 const categories = ref<PublicEssayCategory[]>([]);
 const activeCategory = ref('');
 const isLoading = ref(false);
+const initialLoadPending = ref(true);
 const errorMessage = ref('');
+let requestSequence = 0;
 
 const hasMore = computed(() => items.value.length < total.value);
 
@@ -35,36 +38,48 @@ async function loadCategories() {
 }
 
 async function loadFirstPage() {
+  const requestId = ++requestSequence;
+  initialLoadPending.value = true;
   page.value = 1;
   items.value = [];
   total.value = 0;
-  await loadMore();
+  await loadMore(requestId, true);
 }
 
-async function loadMore() {
-  if (isLoading.value) {
+async function loadMore(requestId = requestSequence, force = false) {
+  if (isLoading.value && !force) {
     return;
   }
 
   isLoading.value = true;
   errorMessage.value = '';
+  const requestedCategory = activeCategory.value;
+  const requestedPage = page.value;
 
   try {
     const result = await publicApi.listEssays({
-      category: activeCategory.value || undefined,
-      page: page.value,
+      category: requestedCategory || undefined,
+      page: requestedPage,
       pageSize,
     });
+    if (requestId !== requestSequence) {
+      return;
+    }
     const seen = new Set(items.value.map((item) => item.id));
     const nextItems = result.items.filter((item) => !seen.has(item.id));
 
     items.value = [...items.value, ...nextItems];
     total.value = result.pagination.total;
-    page.value += 1;
+    page.value = requestedPage + 1;
   } catch {
-    errorMessage.value = '随笔加载失败，请稍后重试。';
+    if (requestId === requestSequence) {
+      errorMessage.value = '随笔加载失败，请稍后重试。';
+    }
   } finally {
-    isLoading.value = false;
+    if (requestId === requestSequence) {
+      isLoading.value = false;
+      initialLoadPending.value = false;
+    }
   }
 }
 
@@ -135,7 +150,16 @@ function handleScroll() {
       {{ errorMessage }}
     </p>
 
-    <div class="essay-list">
+    <PageLoadingSkeleton
+      v-if="initialLoadPending && items.length === 0"
+      variant="essays"
+      label="正在翻阅随笔…"
+    />
+
+    <div
+      v-else
+      class="essay-list"
+    >
       <article
         v-for="(item, index) in items"
         :key="item.id"
@@ -182,7 +206,7 @@ function handleScroll() {
     </div>
 
     <div
-      v-if="!isLoading && items.length === 0"
+      v-if="!initialLoadPending && !isLoading && items.length === 0"
       class="empty-state"
     >
       暂无公开随笔。
@@ -193,7 +217,7 @@ function handleScroll() {
       class="load-more"
       type="button"
       :disabled="isLoading"
-      @click="loadMore"
+      @click="loadMore()"
     >
       {{ isLoading ? '加载中' : '加载更多' }}
     </button>

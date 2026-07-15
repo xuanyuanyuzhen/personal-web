@@ -38,10 +38,19 @@ describe('EssaysView', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn((input: URL | RequestInfo) => {
-        const url = typeof input === 'string' ? input : input instanceof URL ? input.pathname + input.search : input.url;
+        const url =
+          typeof input === 'string'
+            ? input
+            : input instanceof URL
+              ? input.pathname + input.search
+              : input.url;
 
         if (url === '/api/essays/categories/public') {
-          return Promise.resolve(jsonResponse([{ description: null, id: 1, isEnabled: true, name: '札记', slug: 'notes' }]));
+          return Promise.resolve(
+            jsonResponse([
+              { description: null, id: 1, isEnabled: true, name: '札记', slug: 'notes' },
+            ]),
+          );
         }
 
         if (url.startsWith('/api/essays/public/1/like')) {
@@ -80,6 +89,27 @@ describe('EssaysView', () => {
     vi.unstubAllGlobals();
   });
 
+  it('shows essay-shaped placeholders before the first list response', () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise<Response>(() => undefined)),
+    );
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { component: { template: '<div />' }, path: '/' },
+        { component: { template: '<div />' }, name: 'essay-detail', path: '/essays/:idOrSlug' },
+      ],
+    });
+
+    const wrapper = mount(EssaysView, {
+      global: { plugins: [router] },
+    });
+
+    expect(wrapper.get('.content-skeleton-essays').attributes('aria-label')).toBe('正在翻阅随笔…');
+    expect(wrapper.find('.empty-state').exists()).toBe(false);
+  });
+
   it('filters by category, deduplicates loaded items, and toggles likes', async () => {
     const router = createRouter({
       history: createMemoryHistory(),
@@ -99,17 +129,28 @@ describe('EssaysView', () => {
 
     await wrapper.get('.load-more').trigger('click');
     await flushPromises();
-    expect(wrapper.findAll('.essay-card h2').map((heading) => heading.text()).filter((text) => text === '第一篇')).toHaveLength(1);
+    expect(
+      wrapper
+        .findAll('.essay-card h2')
+        .map((heading) => heading.text())
+        .filter((text) => text === '第一篇'),
+    ).toHaveLength(1);
     expect(wrapper.text()).toContain('第二篇');
 
     await wrapper.get('.thought-meta button').trigger('click');
     await flushPromises();
     expect(wrapper.text()).toContain('已喜欢 · 3');
 
-    await wrapper.findAll('.essay-filter button').find((button) => button.text() === '札记')?.trigger('click');
+    await wrapper
+      .findAll('.essay-filter button')
+      .find((button) => button.text() === '札记')
+      ?.trigger('click');
     await flushPromises();
     expect(wrapper.text()).toContain('分类结果');
-    expect(fetch).toHaveBeenCalledWith(expect.stringContaining('category=notes'), expect.any(Object));
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('category=notes'),
+      expect.any(Object),
+    );
   });
 });
 
@@ -121,6 +162,26 @@ describe('EssayDetailView', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('does not flash the not-found state while essay detail is loading', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise<Response>(() => undefined)),
+    );
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ component: EssayDetailView, name: 'essay-detail', path: '/essays/:idOrSlug' }],
+    });
+    await router.push('/essays/note-1');
+    await router.isReady();
+
+    const wrapper = mount(EssayDetailView, {
+      global: { plugins: [router] },
+    });
+
+    expect(wrapper.find('.content-skeleton-article').exists()).toBe(true);
+    expect(wrapper.text()).not.toContain('没有找到这篇随笔');
   });
 
   it('renders public essay detail without comment entry', async () => {

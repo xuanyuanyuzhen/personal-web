@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
+import PageLoadingSkeleton from './PageLoadingSkeleton.vue';
 import { useI18n } from '../composables/useI18n';
 import { publicApi, type SearchResponse, type SearchSectionKey } from '../services/api';
 
@@ -18,6 +19,7 @@ const result = ref<SearchResponse | null>(null);
 const isLoading = ref(false);
 const errorMessage = ref('');
 const inputRef = ref<HTMLInputElement | null>(null);
+let requestSequence = 0;
 
 const sectionOrder: SearchSectionKey[] = ['thoughts', 'pages', 'essays', 'photos', 'messages'];
 const visibleSections = computed(() =>
@@ -42,10 +44,12 @@ watch(
 );
 
 async function submitSearch() {
+  const requestId = ++requestSequence;
   const keyword = query.value.trim();
   if (!keyword) {
     result.value = null;
     errorMessage.value = '';
+    isLoading.value = false;
     return;
   }
 
@@ -53,16 +57,23 @@ async function submitSearch() {
   errorMessage.value = '';
 
   try {
-    result.value = await publicApi.search({
+    const nextResult = await publicApi.search({
       page: 1,
       pageSize: 3,
       q: keyword,
     });
+    if (requestId === requestSequence) {
+      result.value = nextResult;
+    }
   } catch {
-    result.value = null;
-    errorMessage.value = t('search.error');
+    if (requestId === requestSequence) {
+      result.value = null;
+      errorMessage.value = t('search.error');
+    }
   } finally {
-    isLoading.value = false;
+    if (requestId === requestSequence) {
+      isLoading.value = false;
+    }
   }
 }
 
@@ -121,12 +132,12 @@ function closeDialog() {
           </button>
         </form>
 
-        <p
+        <PageLoadingSkeleton
           v-if="isLoading"
-          class="search-dialog-status"
-        >
-          {{ t('loading.label') }}
-        </p>
+          :count="2"
+          variant="search"
+          label="正在搜索…"
+        />
         <p
           v-else-if="errorMessage"
           class="search-dialog-status"

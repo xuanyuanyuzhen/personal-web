@@ -16,6 +16,17 @@ describe('CustomPageView', () => {
     vi.unstubAllGlobals();
   });
 
+  it('shows a full article skeleton before custom-page content arrives', () => {
+    vi.mocked(fetch).mockImplementation(() => new Promise<Response>(() => undefined));
+
+    const wrapper = mount(CustomPageView, {
+      global: { plugins: [router] },
+    });
+
+    expect(wrapper.find('.content-skeleton-article').exists()).toBe(true);
+    expect(wrapper.text()).not.toContain('Page not found');
+  });
+
   it('renders a public custom page from the API', async () => {
     vi.mocked(fetch).mockResolvedValueOnce({
       ok: true,

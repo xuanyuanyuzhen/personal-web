@@ -39,7 +39,12 @@ describe('PhotosView', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn((input: URL | RequestInfo) => {
-        const url = typeof input === 'string' ? input : input instanceof URL ? input.pathname + input.search : input.url;
+        const url =
+          typeof input === 'string'
+            ? input
+            : input instanceof URL
+              ? input.pathname + input.search
+              : input.url;
 
         if (url === '/api/albums/public') {
           return Promise.resolve(jsonResponse([{ id: 1, name: '春日', slug: 'spring' }]));
@@ -50,10 +55,20 @@ describe('PhotosView', () => {
         }
 
         if (url.includes('albumId=1')) {
-          return Promise.resolve(jsonResponse({ items: [photo(2, '筛选照片')], pagination: { page: 1, pageSize: 18, total: 1 } }));
+          return Promise.resolve(
+            jsonResponse({
+              items: [photo(2, '筛选照片')],
+              pagination: { page: 1, pageSize: 18, total: 1 },
+            }),
+          );
         }
 
-        return Promise.resolve(jsonResponse({ items: [photo(1, '第一张')], pagination: { page: 1, pageSize: 18, total: 1 } }));
+        return Promise.resolve(
+          jsonResponse({
+            items: [photo(1, '第一张')],
+            pagination: { page: 1, pageSize: 18, total: 1 },
+          }),
+        );
       }),
     );
   });
@@ -72,20 +87,62 @@ describe('PhotosView', () => {
 
     await wrapper.get('.photo-preview-button').trigger('click');
     await flushPromises();
-    expect((document as Document & { startViewTransition?: unknown }).startViewTransition).toHaveBeenCalledTimes(1);
+    expect(
+      (document as Document & { startViewTransition?: unknown }).startViewTransition,
+    ).toHaveBeenCalledTimes(1);
     expect(wrapper.get('.photo-lightbox img').attributes('src')).toBe('/large-1.jpg');
     await wrapper.get('.photo-lightbox button').trigger('click');
     await flushPromises();
-    expect((document as Document & { startViewTransition?: unknown }).startViewTransition).toHaveBeenCalledTimes(2);
+    expect(
+      (document as Document & { startViewTransition?: unknown }).startViewTransition,
+    ).toHaveBeenCalledTimes(2);
     expect(wrapper.find('.photo-lightbox').exists()).toBe(false);
 
     await wrapper.get('.photo-tile-caption button').trigger('click');
     await flushPromises();
     expect(wrapper.text()).toContain('已喜欢 · 3');
 
-    await wrapper.findAll('.photo-filter button').find((button) => button.text() === '春日')?.trigger('click');
+    await wrapper
+      .findAll('.photo-filter button')
+      .find((button) => button.text() === '春日')
+      ?.trigger('click');
     await flushPromises();
     expect(wrapper.text()).toContain('筛选照片');
     expect(fetch).toHaveBeenCalledWith(expect.stringContaining('albumId=1'), expect.any(Object));
+  });
+
+  it('keeps a stable photo wall skeleton visible during the initial request', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise<Response>(() => undefined)),
+    );
+
+    const wrapper = mount(PhotosView);
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.get('.photo-loading-canvas').attributes('aria-label')).toBe('正在装裱照片…');
+    expect(wrapper.findAll('.photo-loading-card')).toHaveLength(4);
+    expect(wrapper.find('.empty-state').exists()).toBe(false);
+  });
+
+  it('moves and rotates a selected photo inside the interactive canvas', async () => {
+    const wrapper = mount(PhotosView);
+    await flushPromises();
+
+    const tile = wrapper.get('.photo-tile-interactive');
+    expect(wrapper.get('.photo-canvas').attributes('style')).toContain('height:');
+    expect(tile.attributes('style')).toContain('rotate(');
+
+    await tile.trigger('focus');
+    const controls = tile.findAll('.photo-card-control');
+    expect(controls).toHaveLength(3);
+
+    const beforeMove = tile.attributes('style');
+    await tile.trigger('keydown', { key: 'ArrowLeft' });
+    expect(tile.attributes('style')).not.toBe(beforeMove);
+
+    const beforeRotation = tile.attributes('style');
+    await controls[1].trigger('click');
+    expect(tile.attributes('style')).not.toBe(beforeRotation);
   });
 });

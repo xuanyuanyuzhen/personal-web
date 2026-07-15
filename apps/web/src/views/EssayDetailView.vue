@@ -2,13 +2,15 @@
 import { onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import HeartLikeButton from '../components/HeartLikeButton.vue';
+import PageLoadingSkeleton from '../components/PageLoadingSkeleton.vue';
 import { publicApi, type PublicEssay } from '../services/api';
 
 const route = useRoute();
 const router = useRouter();
 const essay = ref<PublicEssay | null>(null);
-const isLoading = ref(false);
+const isLoading = ref(true);
 const errorMessage = ref('');
+let requestSequence = 0;
 
 onMounted(loadEssay);
 
@@ -20,8 +22,10 @@ watch(
 );
 
 async function loadEssay() {
+  const requestId = ++requestSequence;
   const idOrSlug = String(route.params.idOrSlug ?? '');
   if (!idOrSlug) {
+    isLoading.value = false;
     await router.replace('/404');
     return;
   }
@@ -30,12 +34,19 @@ async function loadEssay() {
   errorMessage.value = '';
 
   try {
-    essay.value = await publicApi.getEssay(idOrSlug);
+    const nextEssay = await publicApi.getEssay(idOrSlug);
+    if (requestId === requestSequence) {
+      essay.value = nextEssay;
+    }
   } catch {
-    essay.value = null;
-    errorMessage.value = '随笔不存在或暂未公开。';
+    if (requestId === requestSequence) {
+      essay.value = null;
+      errorMessage.value = '随笔不存在或暂未公开。';
+    }
   } finally {
-    isLoading.value = false;
+    if (requestId === requestSequence) {
+      isLoading.value = false;
+    }
   }
 }
 
@@ -55,8 +66,22 @@ async function toggleLike() {
 </script>
 
 <template>
+  <section
+    v-if="isLoading"
+    class="essay-detail essay-detail-loading"
+  >
+    <p class="page-placeholder-eyebrow">
+      随笔
+    </p>
+    <h1>正在翻阅这篇随笔</h1>
+    <PageLoadingSkeleton
+      variant="article"
+      label="正在整理正文…"
+    />
+  </section>
+
   <article
-    v-if="essay"
+    v-else-if="essay"
     class="essay-detail"
   >
     <p class="page-placeholder-eyebrow">

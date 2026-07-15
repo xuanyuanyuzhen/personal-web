@@ -376,3 +376,28 @@ a {
 .rich-editor-body {
   min-height: 320px;
 }
+
+.photo-dialog-upload {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  width: 100%;
+}
+
+.photo-dialog-upload span {
+  color: #718096;
+  font-size: 13px;
+}
+
+.photo-dialog-preview {
+  background: #f7f8fa;
+  border: 1px solid #dcdfe6;
+  border-radius: 8px;
+  display: block;
+  margin-top: 12px;
+  max-height: 220px;
+  object-fit: contain;
+  padding: 8px;
+  width: min(100%, 360px);
+}
