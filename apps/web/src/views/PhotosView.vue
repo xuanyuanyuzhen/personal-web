@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import InteractivePhotoCanvas from '../components/InteractivePhotoCanvas.vue';
 import PageLoadingSkeleton from '../components/PageLoadingSkeleton.vue';
 import { useI18n } from '../composables/useI18n';
@@ -14,15 +14,27 @@ const photos = ref<PublicPhoto[]>([]);
 const activeAlbumId = ref<number | null>(null);
 const isLoading = ref(false);
 const initialLoadPending = ref(true);
-const errorMessage = ref('');
+const loadErrorMessage = ref('');
+const actionErrorMessage = ref('');
+const busyLikeIds = ref(new Set<number>());
 const previewPhoto = ref<PublicPhoto | null>(null);
 const transitionPhotoId = ref<number | null>(null);
+const closePreviewButton = ref<HTMLButtonElement | null>(null);
 let requestSequence = 0;
+let lastFocusedElement: HTMLElement | null = null;
+let previousBodyOverflow = '';
+let previewStateActive = false;
 
 const hasMore = computed(() => photos.value.length < total.value);
 
 onMounted(() => {
   void Promise.all([loadAlbums(), loadFirstPage()]);
+  window.addEventListener('keydown', handleWindowKeydown);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleWindowKeydown);
+  restorePreviewState(false);
 });
 
 async function loadAlbums() {
@@ -36,6 +48,7 @@ async function loadAlbums() {
 async function loadFirstPage() {
   const requestId = ++requestSequence;
   initialLoadPending.value = true;
+  actionErrorMessage.value = '';
   page.value = 1;
   photos.value = [];
   total.value = 0;
@@ -48,7 +61,7 @@ async function loadMore(requestId = requestSequence, force = false) {
   }
 
   isLoading.value = true;
-  errorMessage.value = '';
+  loadErrorMessage.value = '';
   const requestedAlbumId = activeAlbumId.value;
   const requestedPage = page.value;
 
@@ -67,7 +80,7 @@ async function loadMore(requestId = requestSequence, force = false) {
     page.value = requestedPage + 1;
   } catch {
     if (requestId === requestSequence) {
-      errorMessage.value = '照片加载失败，请稍后重试。';
+      loadErrorMessage.value = '照片加载失败，请稍后重试。';
     }
   } finally {
     if (requestId === requestSequence) {
@@ -83,12 +96,20 @@ async function selectAlbum(albumId: number | null) {
 }
 
 async function toggleLike(photo: PublicPhoto) {
+  if (busyLikeIds.value.has(photo.id)) {
+    return;
+  }
+
+  busyLikeIds.value.add(photo.id);
+  actionErrorMessage.value = '';
   try {
     const result = await publicApi.togglePhotoLike(photo.id);
     photo.liked = result.liked;
     photo.likeCount = result.likeCount;
   } catch {
-    errorMessage.value = '点赞失败，请稍后重试。';
+    actionErrorMessage.value = t('feedback.likeFailed');
+  } finally {
+    busyLikeIds.value.delete(photo.id);
   }
 }
 
@@ -113,12 +134,22 @@ async function runPhotoViewTransition(update: () => Promise<void>) {
 }
 
 async function openPreview(photo: PublicPhoto) {
+  if (previewPhoto.value) {
+    return;
+  }
+
+  lastFocusedElement =
+    document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  previousBodyOverflow = document.body.style.overflow;
+  previewStateActive = true;
+  document.body.style.overflow = 'hidden';
   transitionPhotoId.value = photo.id;
   await nextTick();
   await runPhotoViewTransition(async () => {
     previewPhoto.value = photo;
     await nextTick();
   });
+  closePreviewButton.value?.focus();
 }
 
 async function closePreview() {
@@ -134,6 +165,34 @@ async function closePreview() {
     await nextTick();
   });
   transitionPhotoId.value = null;
+  restorePreviewState(true);
+}
+
+function handleWindowKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && previewPhoto.value) {
+    event.preventDefault();
+    void closePreview();
+  }
+}
+
+function keepPreviewFocus(event: KeyboardEvent) {
+  event.preventDefault();
+  closePreviewButton.value?.focus();
+}
+
+function restorePreviewState(restoreFocus: boolean) {
+  if (!previewStateActive) {
+    return;
+  }
+
+  document.body.style.overflow = previousBodyOverflow;
+  previewStateActive = false;
+
+  if (restoreFocus && lastFocusedElement?.isConnected) {
+    lastFocusedElement.focus();
+  }
+
+  lastFocusedElement = null;
 }
 </script>
 
@@ -142,6 +201,8 @@ async function closePreview() {
     <section
       class="photos-page"
       aria-labelledby="photos-title"
+      :aria-hidden="previewPhoto ? 'true' : undefined"
+      :inert="previewPhoto ? true : undefined"
     >
       <p class="page-placeholder-eyebrow">
         {{ t('nav.photos') }}
@@ -173,12 +234,33 @@ async function closePreview() {
         </button>
       </div>
 
-      <p
-        v-if="errorMessage"
-        class="thought-error"
+      <div
+        v-if="loadErrorMessage || actionErrorMessage"
+        class="content-feedback"
+        role="alert"
       >
-        {{ errorMessage }}
-      </p>
+        <p
+          v-if="loadErrorMessage"
+          class="thought-error"
+        >
+          {{ loadErrorMessage }}
+        </p>
+        <p
+          v-if="actionErrorMessage"
+          class="thought-error"
+        >
+          {{ actionErrorMessage }}
+        </p>
+        <button
+          v-if="loadErrorMessage && photos.length === 0"
+          class="load-more content-retry"
+          type="button"
+          :disabled="isLoading"
+          @click="loadFirstPage"
+        >
+          {{ t('action.retry') }}
+        </button>
+      </div>
 
       <PageLoadingSkeleton
         v-if="initialLoadPending && photos.length === 0"
@@ -189,6 +271,7 @@ async function closePreview() {
       <InteractivePhotoCanvas
         v-if="photos.length"
         :photos="photos"
+        :busy-like-ids="busyLikeIds"
         :preview-open="previewPhoto !== null"
         :transition-photo-id="transitionPhotoId"
         @preview="openPreview"
@@ -196,7 +279,7 @@ async function closePreview() {
       />
 
       <div
-        v-if="!initialLoadPending && !isLoading && photos.length === 0"
+        v-if="!initialLoadPending && !isLoading && !loadErrorMessage && photos.length === 0"
         class="empty-state"
       >
         暂无公开照片。
@@ -219,6 +302,7 @@ async function closePreview() {
       role="dialog"
       aria-modal="true"
       @click.self="closePreview"
+      @keydown.tab="keepPreviewFocus"
     >
       <figure>
         <img
@@ -236,6 +320,7 @@ async function closePreview() {
           </span>
         </figcaption>
         <button
+          ref="closePreviewButton"
           type="button"
           @click="closePreview"
         >

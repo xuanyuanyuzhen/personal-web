@@ -11,6 +11,13 @@ function jsonResponse(body: unknown) {
   } as Response;
 }
 
+function errorResponse() {
+  return {
+    ok: false,
+    json: async () => ({}),
+  } as Response;
+}
+
 function requestUrl(input: URL | RequestInfo): string {
   if (typeof input === 'string') {
     return input;
@@ -209,5 +216,91 @@ describe('Search UI', () => {
 
     expect(router.currentRoute.value.query.q).toBe('夏日');
     expect(wrapper.text()).toContain('夏日随笔');
+  });
+
+  it('retries the same routed query after a failed request', async () => {
+    let attempts = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => {
+        attempts += 1;
+        return Promise.resolve(
+          attempts === 1 ? errorResponse() : jsonResponse(searchResponse('春日')),
+        );
+      }),
+    );
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { component: SearchResultsView, name: 'search', path: '/search' },
+        { component: { template: '<div />' }, name: 'essay-detail', path: '/essays/:idOrSlug' },
+        { component: { template: '<div />' }, name: 'photos', path: '/photos' },
+      ],
+    });
+    await router.push('/search?q=春日');
+    await router.isReady();
+
+    const wrapper = mount(SearchResultsView, {
+      global: { plugins: [router] },
+    });
+    await flushPromises();
+
+    expect(wrapper.find('.content-retry').exists()).toBe(true);
+
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+
+    expect(attempts).toBe(2);
+    expect(wrapper.text()).toContain('春日随笔');
+  });
+
+  it('loads later search result pages without duplicating existing items', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: URL | RequestInfo) => {
+        const parsed = new URL(requestUrl(input), 'http://localhost');
+        const requestedPage = Number(parsed.searchParams.get('page') ?? 1);
+        const response = searchResponse('分页');
+        response.sections.essays.items = [
+          {
+            createdAt: '2026-06-03T00:00:00.000Z',
+            excerpt: `第 ${requestedPage} 页`,
+            id: requestedPage,
+            title: `分页随笔 ${requestedPage}`,
+            type: 'essays',
+            url: `/essays/page-${requestedPage}`,
+          },
+        ];
+        response.sections.essays.pagination = {
+          page: requestedPage,
+          pageSize: 10,
+          total: 2,
+        };
+        return Promise.resolve(jsonResponse(response));
+      }),
+    );
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { component: SearchResultsView, name: 'search', path: '/search' },
+        { component: { template: '<div />' }, name: 'essay-detail', path: '/essays/:idOrSlug' },
+        { component: { template: '<div />' }, name: 'photos', path: '/photos' },
+      ],
+    });
+    await router.push('/search?q=分页');
+    await router.isReady();
+
+    const wrapper = mount(SearchResultsView, {
+      global: { plugins: [router] },
+    });
+    await flushPromises();
+
+    expect(wrapper.findAll('.search-page-link')).toHaveLength(2);
+    await wrapper.get('.load-more').trigger('click');
+    await flushPromises();
+
+    expect(fetch).toHaveBeenCalledWith(expect.stringContaining('page=2'), expect.any(Object));
+    expect(wrapper.text()).toContain('分页随笔 1');
+    expect(wrapper.text()).toContain('分页随笔 2');
   });
 });

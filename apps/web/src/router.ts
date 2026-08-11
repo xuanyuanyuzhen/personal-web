@@ -1,17 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import { nextTick } from 'vue';
 import { setGlobalLoading } from './composables/useLoading';
-import {
-  armRoutePageFlipCleanup,
-  getRoutePageFlipSession,
-  isRoutePageFlipActive,
-  startRoutePageFlip,
-} from './composables/usePageFlip';
-import {
-  capturePageTurnSource,
-  capturePageTurnTarget,
-  clearPageTurnSnapshots,
-} from './composables/usePageTurnSnapshot';
 import HomeView from './views/HomeView.vue';
 
 export const router = createRouter({
@@ -81,33 +69,10 @@ export const router = createRouter({
   ],
 });
 
-router.beforeEach((to, from) => {
-  const session = startRoutePageFlip(from, to);
-
-  if (session === null) {
-    clearPageTurnSnapshots();
-  } else {
-    capturePageTurnSource(session);
-  }
-
+router.beforeEach(() => {
   setGlobalLoading(true);
 });
 
-router.afterEach(async (to, _from, failure) => {
+router.afterEach(() => {
   setGlobalLoading(false);
-
-  const session = getRoutePageFlipSession(to);
-
-  if (failure || !isRoutePageFlipActive(session)) {
-    return;
-  }
-
-  await nextTick();
-
-  if (!isRoutePageFlipActive(session)) {
-    return;
-  }
-
-  capturePageTurnTarget(session!);
-  armRoutePageFlipCleanup(session, () => clearPageTurnSnapshots(session!));
 });

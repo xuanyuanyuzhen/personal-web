@@ -14,6 +14,8 @@ const queryInput = ref(initialQuery);
 const result = ref<SearchResponse | null>(null);
 const isLoading = ref(Boolean(initialQuery.trim()));
 const errorMessage = ref('');
+const page = ref(1);
+const pageSize = 10;
 let requestSequence = 0;
 
 const sectionOrder: SearchSectionKey[] = ['thoughts', 'pages', 'essays', 'photos', 'messages'];
@@ -27,17 +29,26 @@ const visibleSections = computed(() =>
     .filter((item) => item.section && item.section.items.length > 0),
 );
 const hasResult = computed(() => visibleSections.value.length > 0);
+const hasMore = computed(() =>
+  Boolean(
+    result.value &&
+    sectionOrder.some((key) => {
+      const section = result.value?.sections[key];
+      return section && section.items.length < section.pagination.total;
+    }),
+  ),
+);
 
 onMounted(() => {
   syncFromRoute();
-  void loadResults();
+  void loadResults(false);
 });
 
 watch(
   () => route.query.q,
   () => {
     syncFromRoute();
-    void loadResults();
+    void loadResults(false);
   },
 );
 
@@ -47,37 +58,54 @@ function syncFromRoute() {
 
 async function submitSearch() {
   const keyword = queryInput.value.trim();
+
+  if (keyword === readRouteQuery()) {
+    await loadResults(false);
+    return;
+  }
+
   await router.push({
     name: 'search',
     query: keyword ? { q: keyword } : {},
   });
 }
 
-async function loadResults() {
+async function loadResults(append: boolean) {
+  if (isLoading.value && append) {
+    return;
+  }
+
   const requestId = ++requestSequence;
   const keyword = queryInput.value.trim();
   if (!keyword) {
     result.value = null;
+    page.value = 1;
     errorMessage.value = '';
     isLoading.value = false;
     return;
   }
 
+  if (!append) {
+    page.value = 1;
+    result.value = null;
+  }
+
   isLoading.value = true;
   errorMessage.value = '';
+  const requestedPage = page.value;
 
   try {
     const nextResult = await publicApi.search({
-      page: 1,
-      pageSize: 10,
+      page: requestedPage,
+      pageSize,
       q: keyword,
     });
     if (requestId === requestSequence) {
-      result.value = nextResult;
+      result.value = append && result.value ? mergeResults(result.value, nextResult) : nextResult;
+      page.value = requestedPage + 1;
     }
   } catch {
     if (requestId === requestSequence) {
-      result.value = null;
       errorMessage.value = t('search.error');
     }
   } finally {
@@ -85,6 +113,37 @@ async function loadResults() {
       isLoading.value = false;
     }
   }
+}
+
+function readRouteQuery() {
+  return typeof route.query.q === 'string' ? route.query.q.trim() : '';
+}
+
+function retrySearch() {
+  return loadResults(Boolean(result.value));
+}
+
+function mergeResults(current: SearchResponse, next: SearchResponse): SearchResponse {
+  const sections = {} as SearchResponse['sections'];
+
+  sectionOrder.forEach((key) => {
+    const currentSection = current.sections[key];
+    const nextSection = next.sections[key];
+    const seen = new Set(currentSection.items.map((item) => `${item.type}-${item.id}`));
+
+    sections[key] = {
+      items: [
+        ...currentSection.items,
+        ...nextSection.items.filter((item) => !seen.has(`${item.type}-${item.id}`)),
+      ],
+      pagination: nextSection.pagination,
+    };
+  });
+
+  return {
+    query: next.query,
+    sections,
+  };
 }
 </script>
 
@@ -122,18 +181,29 @@ async function loadResults() {
     </form>
 
     <PageLoadingSkeleton
-      v-if="isLoading"
+      v-if="isLoading && !result"
       variant="search"
       label="正在搜索…"
     />
-    <p
-      v-else-if="errorMessage"
-      class="search-dialog-status"
-    >
-      {{ errorMessage }}
-    </p>
     <div
-      v-else-if="result"
+      v-if="errorMessage"
+      class="content-feedback"
+      role="alert"
+    >
+      <p class="search-dialog-status">
+        {{ errorMessage }}
+      </p>
+      <button
+        class="load-more content-retry"
+        type="button"
+        :disabled="isLoading"
+        @click="retrySearch"
+      >
+        {{ t('action.retry') }}
+      </button>
+    </div>
+    <div
+      v-if="result"
       class="search-page-results"
     >
       <div
@@ -162,6 +232,16 @@ async function loadResults() {
           <span>{{ resultItem.excerpt }}</span>
         </RouterLink>
       </section>
+
+      <button
+        v-if="hasMore"
+        class="load-more"
+        type="button"
+        :disabled="isLoading"
+        @click="loadResults(true)"
+      >
+        {{ isLoading ? t('loading.label') : t('action.loadMore') }}
+      </button>
     </div>
   </section>
 </template>

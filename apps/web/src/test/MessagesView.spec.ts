@@ -84,4 +84,21 @@ describe('MessagesView', () => {
     );
     expect(wrapper.text()).toContain('留言已公开');
   });
+
+  it('keeps list failures separate from form feedback and exposes retry', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve({ ok: false, json: async () => ({}) } as Response)),
+    );
+
+    const wrapper = mount(MessagesView);
+    await flushPromises();
+
+    expect(wrapper.find('.content-retry').exists()).toBe(true);
+    expect(wrapper.find('.empty-state').exists()).toBe(false);
+
+    await wrapper.get('form').trigger('submit');
+    expect(wrapper.find('.message-form-actions .thought-error').exists()).toBe(true);
+    expect(wrapper.find('.content-feedback .thought-error').exists()).toBe(true);
+  });
 });

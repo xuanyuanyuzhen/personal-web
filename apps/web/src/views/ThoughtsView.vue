@@ -4,6 +4,7 @@ import HeartLikeButton from '../components/HeartLikeButton.vue';
 import PageLoadingSkeleton from '../components/PageLoadingSkeleton.vue';
 import { useI18n } from '../composables/useI18n';
 import { publicApi, type PublicThought, type PublicThoughtTag } from '../services/api';
+import { sanitizeRichHtml } from '../utils/sanitizeHtml';
 
 const { t } = useI18n();
 const page = ref(1);
@@ -14,7 +15,9 @@ const tags = ref<PublicThoughtTag[]>([]);
 const activeTag = ref('');
 const isLoading = ref(false);
 const initialLoadPending = ref(true);
-const errorMessage = ref('');
+const loadErrorMessage = ref('');
+const actionErrorMessage = ref('');
+const busyLikeIds = ref(new Set<number>());
 let requestSequence = 0;
 
 const hasMore = computed(() => items.value.length < total.value);
@@ -39,6 +42,7 @@ async function loadTags() {
 async function loadFirstPage() {
   const requestId = ++requestSequence;
   initialLoadPending.value = true;
+  actionErrorMessage.value = '';
   page.value = 1;
   items.value = [];
   total.value = 0;
@@ -51,7 +55,7 @@ async function loadMore(requestId = requestSequence, force = false) {
   }
 
   isLoading.value = true;
-  errorMessage.value = '';
+  loadErrorMessage.value = '';
   const requestedPage = page.value;
   const requestedTag = activeTag.value;
 
@@ -72,7 +76,7 @@ async function loadMore(requestId = requestSequence, force = false) {
     page.value = requestedPage + 1;
   } catch {
     if (requestId === requestSequence) {
-      errorMessage.value = '碎碎念加载失败，请稍后重试。';
+      loadErrorMessage.value = '碎碎念加载失败，请稍后重试。';
     }
   } finally {
     if (requestId === requestSequence) {
@@ -88,12 +92,20 @@ async function selectTag(tag: string) {
 }
 
 async function toggleLike(item: PublicThought) {
+  if (busyLikeIds.value.has(item.id)) {
+    return;
+  }
+
+  busyLikeIds.value.add(item.id);
+  actionErrorMessage.value = '';
   try {
     const result = await publicApi.toggleThoughtLike(item.id);
     item.liked = result.liked;
     item.likeCount = result.likeCount;
   } catch {
-    errorMessage.value = '点赞失败，请稍后重试。';
+    actionErrorMessage.value = t('feedback.likeFailed');
+  } finally {
+    busyLikeIds.value.delete(item.id);
   }
 }
 
@@ -142,12 +154,33 @@ function handleScroll() {
       </button>
     </div>
 
-    <p
-      v-if="errorMessage"
-      class="thought-error"
+    <div
+      v-if="loadErrorMessage || actionErrorMessage"
+      class="content-feedback"
+      role="alert"
     >
-      {{ errorMessage }}
-    </p>
+      <p
+        v-if="loadErrorMessage"
+        class="thought-error"
+      >
+        {{ loadErrorMessage }}
+      </p>
+      <p
+        v-if="actionErrorMessage"
+        class="thought-error"
+      >
+        {{ actionErrorMessage }}
+      </p>
+      <button
+        v-if="loadErrorMessage && items.length === 0"
+        class="load-more content-retry"
+        type="button"
+        :disabled="isLoading"
+        @click="loadFirstPage"
+      >
+        {{ t('action.retry') }}
+      </button>
+    </div>
 
     <PageLoadingSkeleton
       v-if="initialLoadPending && items.length === 0"
@@ -173,7 +206,7 @@ function handleScroll() {
         <!-- eslint-disable vue/no-v-html -->
         <div
           class="custom-page-content"
-          v-html="item.content"
+          v-html="sanitizeRichHtml(item.content)"
         />
         <!-- eslint-enable vue/no-v-html -->
         <div class="thought-meta">
@@ -188,6 +221,7 @@ function handleScroll() {
           <HeartLikeButton
             :liked="item.liked"
             :like-count="item.likeCount"
+            :disabled="busyLikeIds.has(item.id)"
             @toggle="toggleLike(item)"
           />
         </div>
@@ -195,7 +229,7 @@ function handleScroll() {
     </div>
 
     <div
-      v-if="!initialLoadPending && !isLoading && items.length === 0"
+      v-if="!initialLoadPending && !isLoading && !loadErrorMessage && items.length === 0"
       class="empty-state"
     >
       暂无公开碎碎念。

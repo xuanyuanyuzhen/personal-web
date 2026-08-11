@@ -1,12 +1,18 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import PageLoadingSkeleton from '../components/PageLoadingSkeleton.vue';
 import { useI18n } from '../composables/useI18n';
 import { publicApi, type SiteSettings } from '../services/api';
+import { sanitizeRichHtml } from '../utils/sanitizeHtml';
 
 const { t } = useI18n();
 const settings = ref<SiteSettings | null>(null);
 const isLoading = ref(true);
+
+// 净化结果缓存成 computed，避免模板每次重渲染都重新 parse 整篇 HTML。
+const aboutHtml = computed(() =>
+  sanitizeRichHtml(settings.value?.aboutContent || t('page.about.body')),
+);
 
 onMounted(async () => {
   try {
@@ -72,7 +78,7 @@ onMounted(async () => {
       <!-- eslint-disable vue/no-v-html -->
       <div
         class="custom-page-content"
-        v-html="settings?.aboutContent || t('page.about.body')"
+        v-html="aboutHtml"
       />
       <!-- eslint-enable vue/no-v-html -->
     </template>

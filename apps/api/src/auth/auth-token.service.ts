@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { isProduction } from '../config/env';
 
 export type AuthTokenPayload = {
   sub: number;
@@ -46,7 +47,9 @@ export class AuthTokenService {
   }
 
   private decodePayload(payload: string): AuthTokenPayload {
-    const parsed = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as Partial<AuthTokenPayload>;
+    const parsed = JSON.parse(
+      Buffer.from(payload, 'base64url').toString('utf8'),
+    ) as Partial<AuthTokenPayload>;
 
     if (
       typeof parsed.sub !== 'number' ||
@@ -73,6 +76,17 @@ export class AuthTokenService {
   }
 
   private secret(): string {
-    return process.env.JWT_SECRET ?? 'local-development-jwt-secret';
+    const configured = process.env.JWT_SECRET?.trim();
+    if (configured) {
+      return configured;
+    }
+
+    // 生产环境不允许兜底：`validateEnvironment()` 已在启动期拦下这种情况，
+    // 这里再挡一次，避免将来有人绕过启动校验直接用到这个 service。
+    if (isProduction()) {
+      throw new Error('JWT_SECRET is not configured.');
+    }
+
+    return 'local-development-jwt-secret';
   }
 }

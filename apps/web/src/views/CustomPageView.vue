@@ -1,27 +1,25 @@
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import PageLoadingSkeleton from '../components/PageLoadingSkeleton.vue';
 import { useI18n } from '../composables/useI18n';
 import { publicApi } from '../services/api';
+import { sanitizeRichHtml } from '../utils/sanitizeHtml';
 
 const route = useRoute();
 const { t } = useI18n();
 
 const page = ref(null);
-const isLoading = ref(false);
+const isLoading = ref(true);
 const hasError = ref(false);
 let requestSequence = 0;
 
 const slug = computed(() => String(route.params.slug ?? ''));
 
-watch(
-  slug,
-  () => {
-    loadPage();
-  },
-  { immediate: true },
-);
+// 净化结果缓存成 computed，避免模板每次重渲染都重新 parse 整篇 HTML。
+const contentHtml = computed(() => sanitizeRichHtml(page.value?.content));
+
+onMounted(loadPage);
 
 async function loadPage() {
   const requestId = ++requestSequence;
@@ -111,7 +109,7 @@ async function loadPage() {
     <!-- eslint-disable vue/no-v-html -->
     <div
       class="custom-page-content"
-      v-html="page.content"
+      v-html="contentHtml"
     />
     <!-- eslint-enable vue/no-v-html -->
   </article>

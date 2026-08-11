@@ -15,7 +15,9 @@ const categories = ref<PublicEssayCategory[]>([]);
 const activeCategory = ref('');
 const isLoading = ref(false);
 const initialLoadPending = ref(true);
-const errorMessage = ref('');
+const loadErrorMessage = ref('');
+const actionErrorMessage = ref('');
+const busyLikeIds = ref(new Set<number>());
 let requestSequence = 0;
 
 const hasMore = computed(() => items.value.length < total.value);
@@ -40,6 +42,7 @@ async function loadCategories() {
 async function loadFirstPage() {
   const requestId = ++requestSequence;
   initialLoadPending.value = true;
+  actionErrorMessage.value = '';
   page.value = 1;
   items.value = [];
   total.value = 0;
@@ -52,7 +55,7 @@ async function loadMore(requestId = requestSequence, force = false) {
   }
 
   isLoading.value = true;
-  errorMessage.value = '';
+  loadErrorMessage.value = '';
   const requestedCategory = activeCategory.value;
   const requestedPage = page.value;
 
@@ -73,7 +76,7 @@ async function loadMore(requestId = requestSequence, force = false) {
     page.value = requestedPage + 1;
   } catch {
     if (requestId === requestSequence) {
-      errorMessage.value = '随笔加载失败，请稍后重试。';
+      loadErrorMessage.value = '随笔加载失败，请稍后重试。';
     }
   } finally {
     if (requestId === requestSequence) {
@@ -89,12 +92,20 @@ async function selectCategory(category: string) {
 }
 
 async function toggleLike(item: PublicEssay) {
+  if (busyLikeIds.value.has(item.id)) {
+    return;
+  }
+
+  busyLikeIds.value.add(item.id);
+  actionErrorMessage.value = '';
   try {
     const result = await publicApi.toggleEssayLike(item.id);
     item.liked = result.liked;
     item.likeCount = result.likeCount;
   } catch {
-    errorMessage.value = '点赞失败，请稍后重试。';
+    actionErrorMessage.value = t('feedback.likeFailed');
+  } finally {
+    busyLikeIds.value.delete(item.id);
   }
 }
 
@@ -143,12 +154,33 @@ function handleScroll() {
       </button>
     </div>
 
-    <p
-      v-if="errorMessage"
-      class="thought-error"
+    <div
+      v-if="loadErrorMessage || actionErrorMessage"
+      class="content-feedback"
+      role="alert"
     >
-      {{ errorMessage }}
-    </p>
+      <p
+        v-if="loadErrorMessage"
+        class="thought-error"
+      >
+        {{ loadErrorMessage }}
+      </p>
+      <p
+        v-if="actionErrorMessage"
+        class="thought-error"
+      >
+        {{ actionErrorMessage }}
+      </p>
+      <button
+        v-if="loadErrorMessage && items.length === 0"
+        class="load-more content-retry"
+        type="button"
+        :disabled="isLoading"
+        @click="loadFirstPage"
+      >
+        {{ t('action.retry') }}
+      </button>
+    </div>
 
     <PageLoadingSkeleton
       v-if="initialLoadPending && items.length === 0"
@@ -199,6 +231,7 @@ function handleScroll() {
           <HeartLikeButton
             :liked="item.liked"
             :like-count="item.likeCount"
+            :disabled="busyLikeIds.has(item.id)"
             @toggle="toggleLike(item)"
           />
         </div>
@@ -206,7 +239,7 @@ function handleScroll() {
     </div>
 
     <div
-      v-if="!initialLoadPending && !isLoading && items.length === 0"
+      v-if="!initialLoadPending && !isLoading && !loadErrorMessage && items.length === 0"
       class="empty-state"
     >
       暂无公开随笔。

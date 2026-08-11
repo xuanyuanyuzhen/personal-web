@@ -152,6 +152,36 @@ describe('EssaysView', () => {
       expect.any(Object),
     );
   });
+
+  it('shows a retry action instead of an empty state when the list request fails', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: URL | RequestInfo) => {
+        const url =
+          typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+
+        if (url.includes('/api/essays/categories/public')) {
+          return Promise.resolve(jsonResponse([]));
+        }
+
+        return Promise.resolve(jsonResponse({}, false));
+      }),
+    );
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { component: { template: '<div />' }, path: '/' },
+        { component: { template: '<div />' }, name: 'essay-detail', path: '/essays/:idOrSlug' },
+      ],
+    });
+    const wrapper = mount(EssaysView, {
+      global: { plugins: [router] },
+    });
+    await flushPromises();
+
+    expect(wrapper.find('.content-retry').exists()).toBe(true);
+    expect(wrapper.find('.empty-state').exists()).toBe(false);
+  });
 });
 
 describe('EssayDetailView', () => {

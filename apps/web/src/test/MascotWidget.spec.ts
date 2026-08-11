@@ -111,4 +111,51 @@ describe('MascotWidget', () => {
     await flushPromises();
     expect(wrapper.text()).toContain('碎碎念页面台词');
   });
+
+  it('ignores a stale mascot response after a fast route change', async () => {
+    let resolveHome!: () => void;
+    let resolveThoughts!: () => void;
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: URL | RequestInfo) => {
+        const url = new URL(requestUrl(input), 'http://localhost');
+        const pageKey = url.searchParams.get('pageKey') ?? 'home';
+
+        return new Promise<Response>((resolve) => {
+          const finish = () => resolve(jsonResponse(mascotResponse(pageKey)));
+          if (pageKey === 'thoughts') {
+            resolveThoughts = finish;
+          } else {
+            resolveHome = finish;
+          }
+        });
+      }),
+    );
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { component: { template: '<div />' }, name: 'home', path: '/' },
+        { component: { template: '<div />' }, name: 'thoughts', path: '/thoughts' },
+      ],
+    });
+    await router.push('/');
+    await router.isReady();
+
+    const wrapper = mount(MascotWidget, {
+      global: { plugins: [router] },
+    });
+    await wrapper.vm.$nextTick();
+    await router.push('/thoughts');
+    await wrapper.vm.$nextTick();
+
+    resolveThoughts();
+    await flushPromises();
+    expect(wrapper.text()).toContain('碎碎念页面台词');
+
+    resolveHome();
+    await flushPromises();
+    expect(wrapper.text()).toContain('碎碎念页面台词');
+    expect(wrapper.text()).not.toContain('首页台词');
+  });
 });

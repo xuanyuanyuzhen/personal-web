@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
+import BootTerminal from './components/BootTerminal.vue';
 import NavigationTree from './components/NavigationTree.vue';
 import MascotWidget from './components/MascotWidget.vue';
 import MusicPlayer from './components/MusicPlayer.vue';
@@ -23,6 +24,7 @@ const announcementAvailable = ref(false);
 const mobileMenuOpen = ref(false);
 const searchOpen = ref(false);
 const isPreview = ref(readPreviewMode());
+const bootComplete = ref(true);
 const lastTrackedVisit = ref('');
 
 const sortedNavigation = computed(() =>
@@ -33,6 +35,7 @@ const sortedNavigation = computed(() =>
 const themeLabel = computed(() =>
   isDark.value ? t('settings.themeDark') : t('settings.themeLight'),
 );
+const bootTerminalKey = computed(() => (route.name === 'home' ? String(route.fullPath) : ''));
 getVisitorId();
 
 onMounted(() => {
@@ -40,6 +43,18 @@ onMounted(() => {
   loadAnnouncementAvailability();
   recordCurrentVisit();
 });
+
+watch(
+  () => route.name,
+  (name) => {
+    // 每次进入首页都先亮出开屏终端；是否真的播放由 BootTerminal
+    // 内部按 sessionStorage 判断（本会话播过就瞬间完成并隐藏）。
+    if (name === 'home' && bootComplete.value) {
+      bootComplete.value = false;
+    }
+  },
+  { immediate: true },
+);
 
 watch(
   () => route.fullPath,
@@ -126,6 +141,14 @@ function resolveVisitTarget() {
   }
 
   return { pageId: routeName || 'home', pageType: 'site', path: route.path };
+}
+
+function resolveRouteViewKey(activeRoute) {
+  if (activeRoute.name === 'search') {
+    return `${activeRoute.path}?preview=${String(activeRoute.query.preview ?? '')}`;
+  }
+
+  return activeRoute.fullPath;
 }
 </script>
 
@@ -256,10 +279,15 @@ function resolveVisitTarget() {
 
     <main class="site-main">
       <RouterView v-slot="{ Component, route: activeRoute }">
-        <component
-          :is="Component"
-          :key="activeRoute.fullPath"
-        />
+        <Transition
+          name="page-shift"
+          mode="out-in"
+        >
+          <component
+            :is="Component"
+            :key="resolveRouteViewKey(activeRoute)"
+          />
+        </Transition>
       </RouterView>
     </main>
 
@@ -269,5 +297,10 @@ function resolveVisitTarget() {
     />
     <MusicPlayer />
     <MascotWidget />
+    <BootTerminal
+      v-if="!bootComplete && bootTerminalKey"
+      :key="bootTerminalKey"
+      @done="bootComplete = true"
+    />
   </div>
 </template>

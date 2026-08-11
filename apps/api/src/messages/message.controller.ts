@@ -12,12 +12,19 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBody, ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBody,
+  ApiCookieAuth,
+  ApiOperation,
+  ApiTags,
+  ApiTooManyRequestsResponse,
+} from '@nestjs/swagger';
 import { Request } from 'express';
 import { AdminAuthGuard } from '../auth/admin-auth.guard';
 import { AUTH_COOKIE_NAME } from '../auth/auth.constants';
 import { AuthenticatedRequest } from '../auth/auth.types';
 import { getRequestIp } from '../auth/request-ip';
+import { RateLimit, RateLimitGuard } from '../common/rate-limit.guard';
 import {
   AuditMessageDto,
   CreateCommentDto,
@@ -40,7 +47,10 @@ export class MessageController {
   constructor(private readonly messageService: MessageService) {}
 
   @Post('messages')
+  @UseGuards(RateLimitGuard)
+  @RateLimit({ limit: 5, windowMs: 10 * 60 * 1000 })
   @ApiOperation({ summary: 'Submit a visitor message.' })
+  @ApiTooManyRequestsResponse({ description: 'Too many submissions from this address.' })
   @ApiBody({ type: CreateMessageDto })
   submitMessage(
     @Body() dto: CreateMessageDto,
@@ -58,7 +68,10 @@ export class MessageController {
   }
 
   @Post('comments')
+  @UseGuards(RateLimitGuard)
+  @RateLimit({ limit: 5, windowMs: 10 * 60 * 1000 })
   @ApiOperation({ summary: 'Submit a visitor essay comment.' })
+  @ApiTooManyRequestsResponse({ description: 'Too many submissions from this address.' })
   @ApiBody({ type: CreateCommentDto })
   submitComment(
     @Body() dto: CreateCommentDto,
@@ -88,8 +101,17 @@ export class MessageController {
   @ApiCookieAuth(AUTH_COOKIE_NAME)
   @ApiOperation({ summary: 'Approve or reject a message.' })
   @ApiBody({ type: AuditMessageDto })
-  auditMessage(@Param('id') id: string, @Body() dto: AuditMessageDto, @Req() request: AuthenticatedRequest) {
-    return this.messageService.auditMessage(parseId(id), dto, request.admin.id, getRequestIp(request));
+  auditMessage(
+    @Param('id') id: string,
+    @Body() dto: AuditMessageDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.messageService.auditMessage(
+      parseId(id),
+      dto,
+      request.admin.id,
+      getRequestIp(request),
+    );
   }
 
   @Delete('admin/messages/:id')
@@ -97,7 +119,11 @@ export class MessageController {
   @ApiCookieAuth(AUTH_COOKIE_NAME)
   @ApiOperation({ summary: 'Move a message to recycle bin.' })
   deleteMessage(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
-    return this.messageService.deleteMessageAdmin(parseId(id), request.admin.id, getRequestIp(request));
+    return this.messageService.deleteMessageAdmin(
+      parseId(id),
+      request.admin.id,
+      getRequestIp(request),
+    );
   }
 
   @Get('admin/comments')
@@ -112,8 +138,17 @@ export class MessageController {
   @UseGuards(AdminAuthGuard)
   @ApiCookieAuth(AUTH_COOKIE_NAME)
   @ApiBody({ type: UpdateCommentDto })
-  updateComment(@Param('id') id: string, @Body() dto: UpdateCommentDto, @Req() request: AuthenticatedRequest) {
-    return this.messageService.updateCommentAdmin(parseId(id), dto, request.admin.id, getRequestIp(request));
+  updateComment(
+    @Param('id') id: string,
+    @Body() dto: UpdateCommentDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.messageService.updateCommentAdmin(
+      parseId(id),
+      dto,
+      request.admin.id,
+      getRequestIp(request),
+    );
   }
 
   @Put('admin/comments/:id/audit')
@@ -121,23 +156,45 @@ export class MessageController {
   @ApiCookieAuth(AUTH_COOKIE_NAME)
   @ApiOperation({ summary: 'Approve or reject a comment.' })
   @ApiBody({ type: AuditMessageDto })
-  auditComment(@Param('id') id: string, @Body() dto: AuditMessageDto, @Req() request: AuthenticatedRequest) {
-    return this.messageService.auditComment(parseId(id), dto, request.admin.id, getRequestIp(request));
+  auditComment(
+    @Param('id') id: string,
+    @Body() dto: AuditMessageDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.messageService.auditComment(
+      parseId(id),
+      dto,
+      request.admin.id,
+      getRequestIp(request),
+    );
   }
 
   @Post('admin/comments/:id/reply')
   @UseGuards(AdminAuthGuard)
   @ApiCookieAuth(AUTH_COOKIE_NAME)
   @ApiBody({ type: ReplyCommentDto })
-  replyComment(@Param('id') id: string, @Body() dto: ReplyCommentDto, @Req() request: AuthenticatedRequest) {
-    return this.messageService.replyCommentAdmin(parseId(id), dto, request.admin, getRequestIp(request));
+  replyComment(
+    @Param('id') id: string,
+    @Body() dto: ReplyCommentDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.messageService.replyCommentAdmin(
+      parseId(id),
+      dto,
+      request.admin,
+      getRequestIp(request),
+    );
   }
 
   @Delete('admin/comments/:id')
   @UseGuards(AdminAuthGuard)
   @ApiCookieAuth(AUTH_COOKIE_NAME)
   deleteComment(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
-    return this.messageService.deleteCommentAdmin(parseId(id), request.admin.id, getRequestIp(request));
+    return this.messageService.deleteCommentAdmin(
+      parseId(id),
+      request.admin.id,
+      getRequestIp(request),
+    );
   }
 
   @Get('admin/forbidden-words')
@@ -164,14 +221,23 @@ export class MessageController {
     @Body() dto: UpdateForbiddenWordDto,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.messageService.updateForbiddenWord(parseId(id), dto, request.admin.id, getRequestIp(request));
+    return this.messageService.updateForbiddenWord(
+      parseId(id),
+      dto,
+      request.admin.id,
+      getRequestIp(request),
+    );
   }
 
   @Delete('admin/forbidden-words/:id')
   @UseGuards(AdminAuthGuard)
   @ApiCookieAuth(AUTH_COOKIE_NAME)
   deleteForbiddenWord(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
-    return this.messageService.deleteForbiddenWord(parseId(id), request.admin.id, getRequestIp(request));
+    return this.messageService.deleteForbiddenWord(
+      parseId(id),
+      request.admin.id,
+      getRequestIp(request),
+    );
   }
 
   @Get('admin/blacklist')
@@ -198,14 +264,23 @@ export class MessageController {
     @Body() dto: UpdateBlacklistItemDto,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.messageService.updateBlacklistItem(parseId(id), dto, request.admin.id, getRequestIp(request));
+    return this.messageService.updateBlacklistItem(
+      parseId(id),
+      dto,
+      request.admin.id,
+      getRequestIp(request),
+    );
   }
 
   @Delete('admin/blacklist/:id')
   @UseGuards(AdminAuthGuard)
   @ApiCookieAuth(AUTH_COOKIE_NAME)
   deleteBlacklistItem(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
-    return this.messageService.deleteBlacklistItem(parseId(id), request.admin.id, getRequestIp(request));
+    return this.messageService.deleteBlacklistItem(
+      parseId(id),
+      request.admin.id,
+      getRequestIp(request),
+    );
   }
 }
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import PageLoadingSkeleton from '../components/PageLoadingSkeleton.vue';
 import { useI18n } from '../composables/useI18n';
 import { publicApi, type PublicMessage } from '../services/api';
@@ -12,10 +12,10 @@ const messages = ref<PublicMessage[]>([]);
 const isLoading = ref(false);
 const initialLoadPending = ref(true);
 const isSubmitting = ref(false);
-const errorMessage = ref('');
+const loadErrorMessage = ref('');
+const formErrorMessage = ref('');
 const submitMessage = ref('');
 const loadMoreSentinel = ref<HTMLElement | null>(null);
-const supportsAutoLoad = ref(false);
 let loadMoreObserver: IntersectionObserver | null = null;
 let requestSequence = 0;
 const form = reactive({
@@ -50,7 +50,7 @@ async function loadMore(requestId = requestSequence, force = false) {
   }
 
   isLoading.value = true;
-  errorMessage.value = '';
+  loadErrorMessage.value = '';
   const requestedPage = page.value;
   try {
     const result = await publicApi.listMessages({ page: requestedPage, pageSize });
@@ -67,12 +67,13 @@ async function loadMore(requestId = requestSequence, force = false) {
     page.value = requestedPage + 1;
   } catch {
     if (requestId === requestSequence) {
-      errorMessage.value = '留言加载失败，请稍后重试。';
+      loadErrorMessage.value = '留言加载失败，请稍后重试。';
     }
   } finally {
     if (requestId === requestSequence) {
       isLoading.value = false;
       initialLoadPending.value = false;
+      void nextTick(refreshAutoLoadObserver);
     }
   }
 }
@@ -83,7 +84,6 @@ function setupAutoLoad() {
   }
 
   // 支持 IntersectionObserver 时自动触底加载；老环境保留“加载更多”按钮回退。
-  supportsAutoLoad.value = true;
   loadMoreObserver = new IntersectionObserver(
     (entries) => {
       if (entries.some((entry) => entry.isIntersecting)) {
@@ -92,18 +92,29 @@ function setupAutoLoad() {
     },
     { rootMargin: '240px 0px' },
   );
-  loadMoreObserver.observe(loadMoreSentinel.value);
+  refreshAutoLoadObserver();
+}
+
+function refreshAutoLoadObserver() {
+  if (!loadMoreObserver || !loadMoreSentinel.value) {
+    return;
+  }
+
+  loadMoreObserver.unobserve(loadMoreSentinel.value);
+  if (hasMore.value && !loadErrorMessage.value) {
+    loadMoreObserver.observe(loadMoreSentinel.value);
+  }
 }
 
 async function handleSubmit() {
-  errorMessage.value = '';
+  formErrorMessage.value = '';
   submitMessage.value = '';
   const nickname = form.nickname.trim();
   const email = form.email.trim();
   const content = form.content.trim();
 
   if (!nickname || !email || !content) {
-    errorMessage.value = '请填写昵称、邮箱和留言内容。';
+    formErrorMessage.value = '请填写昵称、邮箱和留言内容。';
     return;
   }
 
@@ -118,7 +129,7 @@ async function handleSubmit() {
       submitMessage.value = '留言已提交，待审核后会出现在这里。';
     }
   } catch {
-    errorMessage.value = '留言提交失败，请稍后重试。';
+    formErrorMessage.value = '留言提交失败，请稍后重试。';
   } finally {
     isSubmitting.value = false;
   }
@@ -180,10 +191,10 @@ function avatarText(message: PublicMessage) {
       </label>
       <div class="message-form-actions">
         <p
-          v-if="errorMessage"
+          v-if="formErrorMessage"
           class="thought-error"
         >
-          {{ errorMessage }}
+          {{ formErrorMessage }}
         </p>
         <p
           v-else-if="submitMessage"
@@ -200,6 +211,25 @@ function avatarText(message: PublicMessage) {
         </button>
       </div>
     </form>
+
+    <div
+      v-if="loadErrorMessage"
+      class="content-feedback"
+      role="alert"
+    >
+      <p class="thought-error">
+        {{ loadErrorMessage }}
+      </p>
+      <button
+        v-if="messages.length === 0"
+        class="load-more content-retry"
+        type="button"
+        :disabled="isLoading"
+        @click="loadFirstPage"
+      >
+        {{ t('action.retry') }}
+      </button>
+    </div>
 
     <PageLoadingSkeleton
       v-if="initialLoadPending && messages.length === 0"
@@ -237,7 +267,7 @@ function avatarText(message: PublicMessage) {
     </div>
 
     <div
-      v-if="!initialLoadPending && !isLoading && messages.length === 0"
+      v-if="!initialLoadPending && !isLoading && !loadErrorMessage && messages.length === 0"
       class="empty-state"
     >
       暂无公开留言。
@@ -254,7 +284,6 @@ function avatarText(message: PublicMessage) {
       class="load-more"
       type="button"
       :disabled="isLoading"
-      :hidden="supportsAutoLoad"
       @click="loadMore()"
     >
       {{ isLoading ? '加载中' : '加载更多' }}

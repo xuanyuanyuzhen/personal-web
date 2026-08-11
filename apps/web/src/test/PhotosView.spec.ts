@@ -91,12 +91,16 @@ describe('PhotosView', () => {
       (document as Document & { startViewTransition?: unknown }).startViewTransition,
     ).toHaveBeenCalledTimes(1);
     expect(wrapper.get('.photo-lightbox img').attributes('src')).toBe('/large-1.jpg');
-    await wrapper.get('.photo-lightbox button').trigger('click');
+    expect(wrapper.get('.photos-page').attributes('inert')).toBe('true');
+    expect(wrapper.get('.photos-page').attributes('aria-hidden')).toBe('true');
+    expect(document.body.style.overflow).toBe('hidden');
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     await flushPromises();
     expect(
       (document as Document & { startViewTransition?: unknown }).startViewTransition,
     ).toHaveBeenCalledTimes(2);
     expect(wrapper.find('.photo-lightbox').exists()).toBe(false);
+    expect(document.body.style.overflow).toBe('');
 
     await wrapper.get('.photo-tile-caption button').trigger('click');
     await flushPromises();
@@ -144,5 +148,27 @@ describe('PhotosView', () => {
     const beforeRotation = tile.attributes('style');
     await controls[1].trigger('click');
     expect(tile.attributes('style')).not.toBe(beforeRotation);
+  });
+
+  it('shows a retry action instead of an empty state when photos fail to load', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: URL | RequestInfo) => {
+        const url =
+          typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+
+        if (url.includes('/api/albums/public')) {
+          return Promise.resolve(jsonResponse([]));
+        }
+
+        return Promise.resolve({ ok: false, json: async () => ({}) } as Response);
+      }),
+    );
+
+    const wrapper = mount(PhotosView);
+    await flushPromises();
+
+    expect(wrapper.find('.content-retry').exists()).toBe(true);
+    expect(wrapper.find('.empty-state').exists()).toBe(false);
   });
 });

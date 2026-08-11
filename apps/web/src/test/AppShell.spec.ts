@@ -27,6 +27,9 @@ function requestUrl(input: URL | RequestInfo): string {
 describe('App shell', () => {
   beforeEach(async () => {
     window.localStorage.clear();
+    window.sessionStorage.clear();
+    // 开屏终端动画在组件测试里直接跳过，保证断言不受动画定时器干扰。
+    window.sessionStorage.setItem('yuer.boot.played', '1');
     setLocale('en');
     setTheme('light');
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('navigation unavailable')));
@@ -49,6 +52,18 @@ describe('App shell', () => {
 
     expect(window.localStorage.getItem('yuer.theme')).toBe('dark');
     expect(document.documentElement.dataset.theme).toBe('dark');
+  });
+
+  it('uses the lightweight route transition', () => {
+    const wrapper = mount(App, {
+      global: {
+        plugins: [router],
+      },
+    });
+
+    const transition = wrapper.get('transition-stub[name="page-shift"]');
+
+    expect(transition.attributes('mode')).toBe('out-in');
   });
 
   it('persists language changes and updates fixed UI text', async () => {

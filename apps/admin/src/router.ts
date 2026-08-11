@@ -1,22 +1,25 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { authState, clearCurrentUser, fetchCurrentUser } from './services/auth';
 import { setUnauthorizedHandler } from './services/request';
-import AdminShell from './views/AdminShell.vue';
-import AnnouncementManageView from './views/AnnouncementManageView.vue';
-import CommentManageView from './views/CommentManageView.vue';
-import CustomPageManageView from './views/CustomPageManageView.vue';
-import DashboardView from './views/DashboardView.vue';
-import EssayManageView from './views/EssayManageView.vue';
-import LoginView from './views/LoginView.vue';
-import MascotManageView from './views/MascotManageView.vue';
-import MessageAuditView from './views/MessageAuditView.vue';
-import MusicManageView from './views/MusicManageView.vue';
-import NavigationManageView from './views/NavigationManageView.vue';
-import PhotoManageView from './views/PhotoManageView.vue';
-import RecycleBinView from './views/RecycleBinView.vue';
-import SettingsView from './views/SettingsView.vue';
-import TagManageView from './views/TagManageView.vue';
-import ThoughtManageView from './views/ThoughtManageView.vue';
+
+// 所有页面都按路由懒加载：之前 15 个视图全是静态 import，
+// 登录页也要先下完整个后台（含 ECharts、wangEditor）才能显示。
+const AdminShell = () => import('./views/AdminShell.vue');
+const AnnouncementManageView = () => import('./views/AnnouncementManageView.vue');
+const CommentManageView = () => import('./views/CommentManageView.vue');
+const CustomPageManageView = () => import('./views/CustomPageManageView.vue');
+const DashboardView = () => import('./views/DashboardView.vue');
+const EssayManageView = () => import('./views/EssayManageView.vue');
+const LoginView = () => import('./views/LoginView.vue');
+const MascotManageView = () => import('./views/MascotManageView.vue');
+const MessageAuditView = () => import('./views/MessageAuditView.vue');
+const MusicManageView = () => import('./views/MusicManageView.vue');
+const NavigationManageView = () => import('./views/NavigationManageView.vue');
+const PhotoManageView = () => import('./views/PhotoManageView.vue');
+const RecycleBinView = () => import('./views/RecycleBinView.vue');
+const SettingsView = () => import('./views/SettingsView.vue');
+const TagManageView = () => import('./views/TagManageView.vue');
+const ThoughtManageView = () => import('./views/ThoughtManageView.vue');
 
 export const router = createRouter({
   history: createWebHistory(),

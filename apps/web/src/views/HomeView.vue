@@ -3,43 +3,33 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import HeartLikeButton from '../components/HeartLikeButton.vue';
 import { useI18n } from '../composables/useI18n';
 import { publicApi, type PublicAnnouncement, type SiteSettings } from '../services/api';
+import { sanitizeRichHtml } from '../utils/sanitizeHtml';
 
-const { locale, t } = useI18n();
+const { t } = useI18n();
 
 const ANNOUNCEMENT_DISMISSED_KEY = 'yuer.home.announcement.dismissed';
 
 const settings = ref<SiteSettings | null>(null);
 const announcement = ref<PublicAnnouncement | null>(null);
-const announcementDismissed = ref(localStorage.getItem(ANNOUNCEMENT_DISMISSED_KEY) === '1');
+const announcementDismissed = ref(false);
 const siteLike = ref({
   likeCount: 0,
   liked: false,
 });
 const likeBusy = ref(false);
+const likeError = ref('');
 
-const siteName = computed(() =>
-  locale.value === 'zh' && settings.value?.siteName ? settings.value.siteName : t('home.title'),
+// 后台配置的内容对所有语言都生效，只在字段为空时才回退到静态翻译文案。
+// 之前的写法是 `locale === 'zh' && field`，切到 en/ja 会直接丢弃后台内容。
+const siteName = computed(() => settings.value?.siteName || t('home.title'));
+const publicName = computed(() => settings.value?.publicName || t('home.kicker'));
+const homeIntroduction = computed(() => settings.value?.homeIntroduction || t('home.intro'));
+const announcementTitle = computed(() => announcement.value?.title || t('home.announcement'));
+const announcementContent = computed(
+  () => announcement.value?.content || t('home.announcementBody'),
 );
-const publicName = computed(() =>
-  locale.value === 'zh' && settings.value?.publicName
-    ? settings.value.publicName
-    : t('home.kicker'),
-);
-const homeIntroduction = computed(() =>
-  locale.value === 'zh' && settings.value?.homeIntroduction
-    ? settings.value.homeIntroduction
-    : t('home.intro'),
-);
-const announcementTitle = computed(() =>
-  locale.value === 'zh' && announcement.value?.title
-    ? announcement.value.title
-    : t('home.announcement'),
-);
-const announcementContent = computed(() =>
-  locale.value === 'zh' && announcement.value?.content
-    ? announcement.value.content
-    : t('home.announcementBody'),
-);
+// 用 computed 缓存净化结果，避免模板里每次重渲染都重新 parse 一遍整段 HTML。
+const announcementHtml = computed(() => sanitizeRichHtml(announcementContent.value));
 const showAnnouncement = computed(() =>
   Boolean(announcement.value && !announcementDismissed.value),
 );
@@ -66,6 +56,11 @@ async function loadHomeData() {
 
   if (nextAnnouncement.status === 'fulfilled') {
     announcement.value = nextAnnouncement.value;
+    announcementDismissed.value = Boolean(
+      nextAnnouncement.value &&
+      localStorage.getItem(ANNOUNCEMENT_DISMISSED_KEY) ===
+        announcementIdentity(nextAnnouncement.value),
+    );
   }
 
   if (nextSiteLike.status === 'fulfilled') {
@@ -75,7 +70,9 @@ async function loadHomeData() {
 
 function closeAnnouncement() {
   announcementDismissed.value = true;
-  localStorage.setItem(ANNOUNCEMENT_DISMISSED_KEY, '1');
+  if (announcement.value) {
+    localStorage.setItem(ANNOUNCEMENT_DISMISSED_KEY, announcementIdentity(announcement.value));
+  }
 }
 
 function handleOpenAnnouncement() {
@@ -89,11 +86,18 @@ async function toggleSiteLike() {
   }
 
   likeBusy.value = true;
+  likeError.value = '';
   try {
     siteLike.value = await publicApi.toggleSiteLike();
+  } catch {
+    likeError.value = t('feedback.likeFailed');
   } finally {
     likeBusy.value = false;
   }
+}
+
+function announcementIdentity(value: PublicAnnouncement) {
+  return `${value.publishedAt ?? 'draft'}:${value.title}`;
 }
 </script>
 
@@ -122,6 +126,13 @@ async function toggleSiteLike() {
           @toggle="toggleSiteLike"
         />
       </div>
+      <p
+        v-if="likeError"
+        class="thought-error"
+        role="alert"
+      >
+        {{ likeError }}
+      </p>
       <aside
         v-if="showAnnouncement && announcement"
         class="notice-strip"
@@ -139,17 +150,10 @@ async function toggleSiteLike() {
         </div>
         <!-- eslint-disable vue/no-v-html -->
         <div
-          v-if="locale === 'zh'"
           class="notice-strip-content"
-          v-html="announcementContent"
+          v-html="announcementHtml"
         />
         <!-- eslint-enable vue/no-v-html -->
-        <p
-          v-else
-          class="notice-strip-content"
-        >
-          {{ announcementContent }}
-        </p>
       </aside>
     </div>
   </section>

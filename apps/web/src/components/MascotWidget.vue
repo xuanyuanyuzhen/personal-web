@@ -9,6 +9,7 @@ const { locale, t } = useI18n();
 const mascot = ref(null);
 const activeLine = ref('');
 const imageFailed = ref(false);
+let requestSequence = 0;
 
 const pageKey = computed(() => resolvePageKey(route.name));
 const visible = computed(() => Boolean(mascot.value));
@@ -25,25 +26,33 @@ watch(
 watch(locale, updateActiveLine);
 
 async function loadMascot() {
+  const requestId = ++requestSequence;
+  const requestedPageKey = pageKey.value;
+
   try {
-    const nextMascot = await publicApi.getMascot(pageKey.value);
+    const nextMascot = await publicApi.getMascot(requestedPageKey);
+    if (requestId !== requestSequence) {
+      return;
+    }
+
     mascot.value = isValidMascot(nextMascot) ? nextMascot : null;
     imageFailed.value = false;
     updateActiveLine();
   } catch {
+    if (requestId !== requestSequence) {
+      return;
+    }
+
     mascot.value = null;
     activeLine.value = '';
   }
 }
 
 function showRandomLine() {
-  if (locale.value !== 'zh') {
-    activeLine.value = t('mascot.welcome');
-    return;
-  }
-
+  // 后台配置的台词对所有语言都展示，只有真的没有台词时才回退到内置文案。
   const lines = mascot.value?.randomLines ?? [];
   if (lines.length === 0) {
+    activeLine.value = activeLine.value || t('mascot.welcome');
     return;
   }
 
@@ -65,10 +74,7 @@ function showRandomLine() {
 }
 
 function updateActiveLine() {
-  activeLine.value =
-    locale.value === 'zh'
-      ? (mascot.value?.pageLine?.content ?? mascot.value?.name ?? '')
-      : t('mascot.welcome');
+  activeLine.value = mascot.value?.pageLine?.content || mascot.value?.name || t('mascot.welcome');
 }
 
 function resolvePageKey(routeName) {

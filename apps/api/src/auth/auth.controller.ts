@@ -5,13 +5,22 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiTags,
+  ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { Request, Response } from 'express';
+import { RateLimit, RateLimitGuard } from '../common/rate-limit.guard';
+import { useSecureCookie } from '../config/env';
 import { AUTH_COOKIE_NAME } from './auth.constants';
 import { AdminAuthGuard } from './admin-auth.guard';
 import { AuthService } from './auth.service';
-import { AdminProfileDto, AuthResponseDto, ChangePasswordDto, LoginDto, OkResponseDto } from './auth.dto';
+import {
+  AdminProfileDto,
+  AuthResponseDto,
+  ChangePasswordDto,
+  LoginDto,
+  OkResponseDto,
+} from './auth.dto';
 import { AuthenticatedRequest } from './auth.types';
 import { getRequestIp } from './request-ip';
 
@@ -22,7 +31,10 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(200)
+  @UseGuards(RateLimitGuard)
+  @RateLimit({ limit: 10, windowMs: 5 * 60 * 1000 })
   @ApiOperation({ summary: 'Admin username and password login.' })
+  @ApiTooManyRequestsResponse({ description: 'Too many login attempts.' })
   @ApiBody({ type: LoginDto })
   @ApiOkResponse({ type: AuthResponseDto })
   @ApiUnauthorizedResponse({ description: 'Invalid username or password.' })
@@ -89,7 +101,9 @@ function cookieOptions(): {
   return {
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    // 依据显式配置而不是 NODE_ENV：启动链路里从未设置 NODE_ENV，
+    // 之前会让生产环境静默退化成明文 cookie。
+    secure: useSecureCookie(),
     path: '/',
   };
 }

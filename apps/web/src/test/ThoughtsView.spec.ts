@@ -118,4 +118,26 @@ describe('ThoughtsView', () => {
     expect(wrapper.text()).toContain('筛选结果');
     expect(fetch).toHaveBeenCalledWith(expect.stringContaining('tag=daily'), expect.any(Object));
   });
+
+  it('shows a retry action instead of an empty state when the list request fails', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: URL | RequestInfo) => {
+        const url =
+          typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+
+        if (url.includes('/api/thoughts/tags/public')) {
+          return Promise.resolve(jsonResponse([]));
+        }
+
+        return Promise.resolve({ ok: false, json: async () => ({}) } as Response);
+      }),
+    );
+
+    const wrapper = mount(ThoughtsView);
+    await flushPromises();
+
+    expect(wrapper.find('.content-retry').exists()).toBe(true);
+    expect(wrapper.find('.empty-state').exists()).toBe(false);
+  });
 });

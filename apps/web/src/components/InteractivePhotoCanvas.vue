@@ -25,6 +25,7 @@ interface ActiveInteraction {
 }
 
 const props = defineProps<{
+  busyLikeIds?: Set<number>;
   photos: PublicPhoto[];
   previewOpen: boolean;
   transitionPhotoId: number | null;
@@ -434,6 +435,7 @@ function handleKeydown(id: number, event: KeyboardEvent) {
         <HeartLikeButton
           :liked="photo.liked"
           :like-count="photo.likeCount"
+          :disabled="busyLikeIds?.has(photo.id)"
           @toggle="emit('toggleLike', photo)"
         />
       </div>
