@@ -28,12 +28,12 @@ describe('App shell', () => {
   beforeEach(async () => {
     window.localStorage.clear();
     window.sessionStorage.clear();
-    // 开屏动画在组件测试里直接跳过（模拟 reduced-motion），
-    // 保证断言不受动画定时器 / rAF 干扰。
+    // 开屏动画不再靠 matchMedia 跳过（开发期必播），改在各 mount 处
+    // stub 掉 BootTerminal；这里保留动画缺省环境即可。
     vi.stubGlobal(
       'matchMedia',
       vi.fn().mockReturnValue({
-        matches: true,
+        matches: false,
         addEventListener: vi.fn(),
         removeEventListener: vi.fn(),
       }),
@@ -53,6 +53,9 @@ describe('App shell', () => {
     const wrapper = mount(App, {
       global: {
         plugins: [router],
+        // 开发期 BootTerminal 无视 reduced-motion 必播，App shell 测试
+        // 不再用 matchMedia 跳过；直接 stub 掉组件，避免动画定时器/rAF 干扰断言。
+        stubs: { BootTerminal: true },
       },
     });
 
@@ -66,6 +69,9 @@ describe('App shell', () => {
     const wrapper = mount(App, {
       global: {
         plugins: [router],
+        // 开发期 BootTerminal 无视 reduced-motion 必播，App shell 测试
+        // 不再用 matchMedia 跳过；直接 stub 掉组件，避免动画定时器/rAF 干扰断言。
+        stubs: { BootTerminal: true },
       },
     });
 
@@ -78,6 +84,9 @@ describe('App shell', () => {
     const wrapper = mount(App, {
       global: {
         plugins: [router],
+        // 开发期 BootTerminal 无视 reduced-motion 必播，App shell 测试
+        // 不再用 matchMedia 跳过；直接 stub 掉组件，避免动画定时器/rAF 干扰断言。
+        stubs: { BootTerminal: true },
       },
     });
 
@@ -135,6 +144,9 @@ describe('App shell', () => {
     const wrapper = mount(App, {
       global: {
         plugins: [router],
+        // 开发期 BootTerminal 无视 reduced-motion 必播，App shell 测试
+        // 不再用 matchMedia 跳过；直接 stub 掉组件，避免动画定时器/rAF 干扰断言。
+        stubs: { BootTerminal: true },
       },
     });
 
@@ -148,6 +160,9 @@ describe('App shell', () => {
     const wrapper = mount(App, {
       global: {
         plugins: [router],
+        // 开发期 BootTerminal 无视 reduced-motion 必播，App shell 测试
+        // 不再用 matchMedia 跳过；直接 stub 掉组件，避免动画定时器/rAF 干扰断言。
+        stubs: { BootTerminal: true },
       },
     });
 
@@ -208,6 +223,9 @@ describe('App shell', () => {
     const wrapper = mount(App, {
       global: {
         plugins: [router],
+        // 开发期 BootTerminal 无视 reduced-motion 必播，App shell 测试
+        // 不再用 matchMedia 跳过；直接 stub 掉组件，避免动画定时器/rAF 干扰断言。
+        stubs: { BootTerminal: true },
       },
     });
 
@@ -256,6 +274,9 @@ describe('App shell', () => {
     const wrapper = mount(App, {
       global: {
         plugins: [router],
+        // 开发期 BootTerminal 无视 reduced-motion 必播，App shell 测试
+        // 不再用 matchMedia 跳过；直接 stub 掉组件，避免动画定时器/rAF 干扰断言。
+        stubs: { BootTerminal: true },
       },
     });
 
@@ -275,6 +296,9 @@ describe('App shell', () => {
     const wrapper = mount(App, {
       global: {
         plugins: [router],
+        // 开发期 BootTerminal 无视 reduced-motion 必播，App shell 测试
+        // 不再用 matchMedia 跳过；直接 stub 掉组件，避免动画定时器/rAF 干扰断言。
+        stubs: { BootTerminal: true },
       },
     });
 

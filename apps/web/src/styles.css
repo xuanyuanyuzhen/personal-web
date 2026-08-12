@@ -132,10 +132,14 @@ a {
   z-index: 1000;
 }
 
+/* 与首页「上浮浮现」转场同时长，形成交叉过渡；微放大如镜头放松。 */
 .boot-terminal.is-leaving {
   opacity: 0;
   pointer-events: none;
-  transition: opacity 340ms ease-out;
+  transform: scale(1.02);
+  transition:
+    opacity 600ms ease-out,
+    transform 600ms ease-out;
 }
 
 .boot-terminal-frame {
@@ -189,6 +193,32 @@ a {
   color: rgb(46 228 111 / 45%);
   font-size: 12px;
   margin: 18px 0 0;
+}
+
+.boot-enter {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.boot-enter-hint {
+  color: rgb(46 228 111 / 45%);
+  font-size: 12px;
+  margin: 18px 0 0;
+}
+
+.boot-progress {
+  background: rgb(46 228 111 / 14%);
+  border-radius: 999px;
+  height: 6px;
+  overflow: hidden;
+  width: min(340px, 100%);
+}
+
+.boot-progress-fill {
+  background: var(--accent);
+  display: block;
+  height: 100%;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -437,6 +467,36 @@ a {
   min-height: calc(100vh - 96px);
   padding: 0 24px 56px;
   position: relative;
+}
+
+/* ------------------------------------------------------------
+   开屏完成转场：终端淡出（is-leaving，600ms）的同时，
+   首页内容从下方 16px 处从容上浮浮现，形成交叉过渡。
+   用 backwards 填充：动画结束后回到自然样式（无 transform），
+   不残留包含块，避免影响视图内的 position: fixed 元素。
+   注意：必须排在 .site-main / .site-header 定义之后，
+   否则 stylelint no-descending-specificity 会报错。
+   ============================================================ */
+.site-shell.boot-reveal .site-main {
+  animation: boot-reveal-rise 600ms ease-out backwards;
+}
+
+.site-shell.boot-reveal .site-header {
+  animation: boot-reveal-header 600ms ease-out backwards;
+}
+
+@keyframes boot-reveal-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+
+@keyframes boot-reveal-header {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
 }
 
 .page-shift-enter-active,
@@ -2504,5 +2564,20 @@ h1 {
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
     transition-duration: 0.001ms !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* 开屏转场是刻意的品牌动画：JS 端已在开发期决定播放（playWhileDeveloping），
+     生产期 reduced-motion 则会整段跳过终端（不挂载、无动画，见 BootTerminal.vue）。
+     这里恢复转场时长，避免被上面的全局减速规则压成 0.001ms，导致
+     「进度条满 → 直接切页」毫无过渡。 */
+  .boot-terminal.is-leaving {
+    transition-duration: 600ms !important;
+  }
+
+  .site-shell.boot-reveal .site-main,
+  .site-shell.boot-reveal .site-header {
+    animation-duration: 600ms !important;
   }
 }

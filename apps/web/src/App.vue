@@ -28,6 +28,9 @@ const isPreview = ref(readPreviewMode());
 // 用 v-if 而非 :key，确保「每次进入首页」都是一次完整的新挂载，
 // onMounted 才会重新执行、动画才会重播。
 const bootOpen = ref(false);
+// 开屏完成（终端开始淡出）后置 true，触发首页内容「上浮浮现」转场；
+// 新一轮开屏时复位，保证每次转场都重新播放。
+const bootReveal = ref(false);
 const lastTrackedVisit = ref('');
 
 const sortedNavigation = computed(() =>
@@ -54,6 +57,7 @@ watch(
     // 离开首页时强制卸载，保证「再进首页」能再次完整挂载。
     if (name === 'home') {
       bootOpen.value = true;
+      bootReveal.value = false; // 新一轮开屏：复位转场，等这次的 @leave 再触发
     } else {
       bootOpen.value = false;
     }
@@ -158,7 +162,10 @@ function resolveRouteViewKey(activeRoute) {
 </script>
 
 <template>
-  <div class="site-shell">
+  <div
+    class="site-shell"
+    :class="{ 'boot-reveal': bootReveal }"
+  >
     <header class="site-header">
       <RouterLink
         class="brand"
@@ -304,6 +311,7 @@ function resolveRouteViewKey(activeRoute) {
     <MascotWidget />
     <BootTerminal
       v-if="bootOpen"
+      @leave="bootReveal = true"
       @done="bootOpen = false"
     />
   </div>

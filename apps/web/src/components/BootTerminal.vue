@@ -8,11 +8,15 @@ import { useI18n } from '../composables/useI18n';
  * 设计约定（与首页/站点风格对齐）：
  * - 黑底绿字，提示符和光标用站点粉色点缀；
  * - 伪命令行一问一答，最后一行落到站点标语；
- * - 支持 Esc / 回车跳过，尊重 prefers-reduced-motion；
+ * - 打字阶段按回车 / Esc 跳过剩余文字（直接落到「等待输入」提示符，
+ *   不会直接进入页面），尊重 prefers-reduced-motion（定稿后生效；
+ *   开发阶段无视它，保证能反复查看效果）；
  * - 开发阶段每次进首页都播放（方便反复查看效果）：
  *   见下方 `playWhileDeveloping`，确认效果后改为 false，恢复一次性播放
  *   （届时重新启用 sessionStorage 记忆 key `yuer.boot.played`）；
- * - 动画打完后，整体淡出露出首页。
+ * - 全部文字打完后停在终端，出现 `$` 提示符 + 闪烁光标等待输入；
+ *   可真实敲入命令（如 clear），回车或点击屏幕进入；
+ *   进入时进度条填充，满则整体淡出露出首页。
  */
 
 const SESSION_KEY = 'yuer.boot.played';
@@ -24,25 +28,35 @@ const SESSION_KEY = 'yuer.boot.played';
  */
 const playWhileDeveloping = true;
 
-const INITIAL_FPS = 20;
-const MIN_FPS = 10;
-const STALL_MS = 160;
-const LS_ITEM_STEP = 240;
-const EXIT_FALLBACK_MS = 500;
+// 打字节奏：20→10 fps 偏快（用户反馈），放慢为 12→7 fps，行间停顿也加长一点。
+const INITIAL_FPS = 12;
+const MIN_FPS = 7;
+const STALL_MS = 200;
+const LS_ITEM_STEP = 300;
+// 点击「进入页面」后进度条从 0 填到 100 的时长。
+const ENTER_ANIM_MS = 1600;
+// 出场淡出 600ms，兜底定时器留足余量，避免 transitionend 没触发时提前卸载。
+const EXIT_FALLBACK_MS = 800;
 
 const { t } = useI18n();
 
-const emit = defineEmits<{ done: [] }>();
+const emit = defineEmits<{ done: []; leave: [] }>();
 
 const isVisible = ref(true);
 const isLeaving = ref(false);
 const lines = ref<string[]>([]);
 const activeOutput = ref('');
 const typedCount = ref(0);
-const hasSkipped = ref(false);
+// 全部文字打完：停在终端，显示底部「进入页面」按钮。
+const scriptDone = ref(false);
+// 点过「进入页面」：进度条开始填充。
+const isEntering = ref(false);
+const progress = ref(0);
+// 打完文字后等待输入的命令（如 clear）。
+const typedCommand = ref('');
 const rootEl = ref<HTMLElement | null>(null);
 
-const hideSkipHint = computed(() => hasSkipped.value || lines.value.length >= 3);
+const hideSkipHint = computed(() => lines.value.length >= 3);
 
 const script = computed(() => buildScript());
 
@@ -51,13 +65,19 @@ let frame: number | undefined;
 let stepIndex = 0;
 let startedAt = 0;
 let elapsed = 0;
+let progressElapsed = 0;
 
 onMounted(() => {
   const prefersReducedMotion =
     typeof window.matchMedia === 'function' &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  if (prefersReducedMotion) {
+  // 开发调试阶段：无视 reduced-motion，确保开发者能反复查看动画效果。
+  // ⚠️ 曾遇到真实环境「刷新看不到动画」：Windows 系统关了「动画效果」
+  // 后，真实浏览器 prefers-reduced-motion 为 reduce，旧逻辑直接跳过不播。
+  // 定稿后（playWhileDeveloping=false）恢复无障碍行为：系统/浏览器开启
+  // 「减少动态效果」时跳过不播。
+  if (!playWhileDeveloping && prefersReducedMotion) {
     isVisible.value = false;
     emit('done');
     return;
@@ -131,7 +151,7 @@ function frameLoop(now: number) {
 }
 
 function finish() {
-  if (isLeaving.value || !isVisible.value) {
+  if (isLeaving.value || !isVisible.value || scriptDone.value) {
     return;
   }
 
@@ -144,16 +164,15 @@ function finish() {
     typedCount.value = step.command.length;
   }
 
-  scheduleEnd();
+  scheduleNext();
 }
 
-function scheduleEnd() {
+function scheduleNext() {
   const nextStep = script.value[stepIndex + 1];
 
   if (!nextStep) {
-    if (script.value[stepIndex]?.output) {
-      startExit();
-    }
+    // 全部文字打完：停在终端，显示底部「进入页面」按钮，等用户点击。
+    scriptDone.value = true;
     return;
   }
 
@@ -194,6 +213,8 @@ function startExit() {
   }
 
   isLeaving.value = true;
+  // 终端开始淡出，通知 App 同步启动首页「上浮浮现」动画，形成交叉过渡。
+  emit('leave');
   markPlayed();
   stopTimers();
 
@@ -203,21 +224,113 @@ function startExit() {
   }, EXIT_FALLBACK_MS);
 }
 
-function handleKeydown(event: KeyboardEvent) {
-  if (event.key === 'Escape' || event.key === 'Enter') {
-    event.preventDefault();
-    skip();
-  }
-}
-
-function skip() {
-  if (!isVisible.value || isLeaving.value) {
+/** 点击「进入页面」：进度条 0 → 100 填充，填满后淡出进入首页。 */
+function enterSite() {
+  if (!scriptDone.value || isEntering.value || isLeaving.value) {
     return;
   }
 
-  hasSkipped.value = true;
+  isEntering.value = true;
+  progressElapsed = 0;
+  startedAt = performance.now();
+  frame = requestAnimationFrame(progressLoop);
+}
+
+function progressLoop(now: number) {
+  const delta = now - startedAt;
+  startedAt = now;
+  progressElapsed += delta;
+
+  progress.value = Math.min(100, Math.floor((progressElapsed / ENTER_ANIM_MS) * 100));
+
+  if (progress.value >= 100) {
+    startExit();
+    return;
+  }
+
+  frame = requestAnimationFrame(progressLoop);
+}
+
+/**
+ * 提交等待阶段的命令：只认 `clear`（进入）；空回车不发任何事，
+ * 其他命令回显 `command not found` 并清空输入，避免「不输命令也能进」。
+ */
+function submitCommand() {
+  if (!scriptDone.value || isEntering.value || isLeaving.value) {
+    return;
+  }
+
+  const cmd = typedCommand.value.trim();
+
+  if (cmd === 'clear') {
+    enterSite();
+    return;
+  }
+
+  if (cmd) {
+    lines.value = [...lines.value, t('terminal.commandNotFound').replace('{cmd}', cmd)];
+    typedCommand.value = '';
+    return;
+  }
+
+  // 空输入：什么都不做，点击屏幕才是直接进入的方式。
+}
+
+function handleKeydown(event: KeyboardEvent) {
+  if (scriptDone.value) {
+    // 打完文字后的「等待输入」阶段：回车提交命令（仅 clear 进入），
+    // 其余按键作为命令输入。点击屏幕则直接进入（见根元素 @click）。
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      submitCommand();
+      return;
+    }
+    appendCommandInput(event);
+    return;
+  }
+
+  // 打字播放阶段：回车 / Esc 跳过剩余文字，直接落到「等待输入」提示符。
+  // 注意：这里只会快进文字，不会直接进入页面——
+  // 进入只能通过点击屏幕，或输入 clear 后回车。
+  if (event.key === 'Enter' || event.key === 'Escape') {
+    event.preventDefault();
+    skipTyping();
+  }
+}
+
+/** 打字阶段按回车 / Esc：跳过剩余文字显示，直接落到「等待输入」提示符。 */
+function skipTyping() {
+  if (scriptDone.value || isLeaving.value || !isVisible.value) {
+    return;
+  }
+
   stopTimers();
-  startExit();
+  lines.value = script.value.map((step) => step.output).filter(Boolean);
+  activeOutput.value = '';
+  typedCount.value = 0;
+  scriptDone.value = true;
+}
+
+/** 把可打印字符/退格追加到 `typedCommand`，模拟终端输入。 */
+function appendCommandInput(event: KeyboardEvent) {
+  if (isEntering.value || isLeaving.value) {
+    return;
+  }
+  if (event.ctrlKey || event.metaKey || event.altKey) {
+    return;
+  }
+
+  if (event.key === 'Backspace') {
+    event.preventDefault();
+    typedCommand.value = typedCommand.value.slice(0, -1);
+    return;
+  }
+
+  // 单字符可打印键（排除 Direction/Dead/Process 等控制类 key）。
+  if (event.key.length === 1) {
+    event.preventDefault();
+    typedCommand.value = (typedCommand.value + event.key).slice(0, 40);
+  }
 }
 
 function handleTransitionEnd(event: TransitionEvent) {
@@ -261,6 +374,7 @@ function stopTimers() {
     aria-modal="true"
     aria-label="terminal welcome"
     @transitionend="handleTransitionEnd"
+    @click="enterSite"
   >
     <div
       class="boot-terminal-frame"
@@ -274,7 +388,7 @@ function stopTimers() {
         {{ line }}
       </p>
       <p
-        v-if="script[stepIndex]?.command"
+        v-if="!scriptDone && script[stepIndex]?.command"
         class="boot-line"
       >
         <span class="boot-prompt-mark">$&nbsp;</span>{{ script[stepIndex].command.slice(0, typedCount) }}
@@ -284,7 +398,7 @@ function stopTimers() {
         >▊</span>
       </p>
       <p
-        v-else
+        v-else-if="!scriptDone"
         class="boot-line"
       >
         {{ activeOutput }}
@@ -299,6 +413,40 @@ function stopTimers() {
       >
         {{ t('terminal.skip') }}
       </p>
+      <p
+        v-if="scriptDone && !isEntering"
+        class="boot-line boot-enter-prompt"
+      >
+        <span class="boot-prompt-mark">$&nbsp;</span>{{ typedCommand }}
+        <span
+          class="boot-cursor-block"
+          aria-hidden="true"
+        >▊</span>
+      </p>
+      <p
+        v-if="scriptDone && !isEntering"
+        class="boot-enter-hint"
+      >
+        {{ t('terminal.enterHint') }}
+      </p>
+      <div
+        v-if="scriptDone && isEntering"
+        class="boot-enter"
+      >
+        <div
+          class="boot-progress"
+          role="progressbar"
+          aria-label="enter site"
+          :aria-valuenow="progress"
+          aria-valuemin="0"
+          aria-valuemax="100"
+        >
+          <span
+            class="boot-progress-fill"
+            :style="{ width: progress + '%' }"
+          />
+        </div>
+      </div>
     </div>
   </div>
 </template>
