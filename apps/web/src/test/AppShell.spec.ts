@@ -28,8 +28,16 @@ describe('App shell', () => {
   beforeEach(async () => {
     window.localStorage.clear();
     window.sessionStorage.clear();
-    // 开屏终端动画在组件测试里直接跳过，保证断言不受动画定时器干扰。
-    window.sessionStorage.setItem('yuer.boot.played', '1');
+    // 开屏动画在组件测试里直接跳过（模拟 reduced-motion），
+    // 保证断言不受动画定时器 / rAF 干扰。
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn().mockReturnValue({
+        matches: true,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      }),
+    );
     setLocale('en');
     setTheme('light');
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('navigation unavailable')));

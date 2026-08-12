@@ -24,7 +24,10 @@ const announcementAvailable = ref(false);
 const mobileMenuOpen = ref(false);
 const searchOpen = ref(false);
 const isPreview = ref(readPreviewMode());
-const bootComplete = ref(true);
+// 开屏终端：进入首页时置 true（全新挂载），播完/离开时置 false（卸载）。
+// 用 v-if 而非 :key，确保「每次进入首页」都是一次完整的新挂载，
+// onMounted 才会重新执行、动画才会重播。
+const bootOpen = ref(false);
 const lastTrackedVisit = ref('');
 
 const sortedNavigation = computed(() =>
@@ -35,7 +38,6 @@ const sortedNavigation = computed(() =>
 const themeLabel = computed(() =>
   isDark.value ? t('settings.themeDark') : t('settings.themeLight'),
 );
-const bootTerminalKey = computed(() => (route.name === 'home' ? String(route.fullPath) : ''));
 getVisitorId();
 
 onMounted(() => {
@@ -47,10 +49,13 @@ onMounted(() => {
 watch(
   () => route.name,
   (name) => {
-    // 每次进入首页都先亮出开屏终端；是否真的播放由 BootTerminal
-    // 内部按 sessionStorage 判断（本会话播过就瞬间完成并隐藏）。
-    if (name === 'home' && bootComplete.value) {
-      bootComplete.value = false;
+    // 开屏终端：每次进入首页都重新挂载（v-if false→true），由
+    // BootTerminal 内部决定本次是否播放（开发期总播 / 定稿后按记忆）。
+    // 离开首页时强制卸载，保证「再进首页」能再次完整挂载。
+    if (name === 'home') {
+      bootOpen.value = true;
+    } else {
+      bootOpen.value = false;
     }
   },
   { immediate: true },
@@ -298,9 +303,8 @@ function resolveRouteViewKey(activeRoute) {
     <MusicPlayer />
     <MascotWidget />
     <BootTerminal
-      v-if="!bootComplete && bootTerminalKey"
-      :key="bootTerminalKey"
-      @done="bootComplete = true"
+      v-if="bootOpen"
+      @done="bootOpen = false"
     />
   </div>
 </template>
