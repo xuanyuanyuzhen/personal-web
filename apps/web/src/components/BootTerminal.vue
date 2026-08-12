@@ -9,11 +9,21 @@ import { useI18n } from '../composables/useI18n';
  * - 黑底绿字，提示符和光标用站点粉色点缀；
  * - 伪命令行一问一答，最后一行落到站点标语；
  * - 支持 Esc / 回车跳过，尊重 prefers-reduced-motion；
- * - 同一浏览器会话只播一次（sessionStorage 记忆）；
+ * - 开发阶段每次进首页都播放（方便反复查看效果）：
+ *   见下方 `playWhileDeveloping`，确认效果后改为 false，恢复一次性播放
+ *   （届时重新启用 sessionStorage 记忆 key `yuer.boot.played`）；
  * - 动画打完后，整体淡出露出首页。
  */
 
 const SESSION_KEY = 'yuer.boot.played';
+
+/**
+ * 开发调试开关：true 时每次进入首页都播放，跳过时不写记忆。
+ * 待开屏动画定稿（用户确认不再改动）后改回 false：
+ * 将恢复「同一浏览器会话只播一次」。
+ */
+const playWhileDeveloping = true;
+
 const INITIAL_FPS = 20;
 const MIN_FPS = 10;
 const STALL_MS = 160;
@@ -46,10 +56,16 @@ onMounted(() => {
   const prefersReducedMotion =
     typeof window.matchMedia === 'function' &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const shouldSkip = sessionStorage.getItem(SESSION_KEY) === '1' || prefersReducedMotion;
 
-  if (shouldSkip) {
-    markPlayed();
+  if (prefersReducedMotion) {
+    isVisible.value = false;
+    emit('done');
+    return;
+  }
+
+  // 开发调试阶段：不读 sessionStorage 记忆，每次进入首页都播放。
+  // 定稿后 `playWhileDeveloping = false`，这里恢复读记忆并跳过已播放的会话。
+  if (!playWhileDeveloping && sessionStorage.getItem(SESSION_KEY) === '1') {
     isVisible.value = false;
     emit('done');
     return;
@@ -200,7 +216,6 @@ function skip() {
   }
 
   hasSkipped.value = true;
-  markPlayed();
   stopTimers();
   startExit();
 }
@@ -211,7 +226,12 @@ function handleTransitionEnd(event: TransitionEvent) {
   }
 }
 
+/** 播放完成 / 被跳过时写入会话记忆。仅定稿后（playWhileDeveloping=false）生效。 */
 function markPlayed() {
+  if (playWhileDeveloping) {
+    return;
+  }
+
   try {
     sessionStorage.setItem(SESSION_KEY, '1');
   } catch {

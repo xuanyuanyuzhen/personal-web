@@ -16,27 +16,14 @@ describe('BootTerminal', () => {
     vi.unstubAllGlobals();
   });
 
-  it('skips immediately and emits done when already played this session', async () => {
-    window.sessionStorage.setItem(SESSION_KEY, '1');
-
-    const wrapper = mount(BootTerminal);
-
-    await nextTick();
-
-    expect(wrapper.find('.boot-terminal').exists()).toBe(false);
-    expect(wrapper.emitted('done')).toHaveLength(1);
-  });
-
   it('skips immediately under prefers-reduced-motion', async () => {
     vi.stubGlobal(
       'matchMedia',
-      vi
-        .fn()
-        .mockReturnValue({
-          matches: true,
-          addEventListener: vi.fn(),
-          removeEventListener: vi.fn(),
-        }),
+      vi.fn().mockReturnValue({
+        matches: true,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      }),
     );
 
     const wrapper = mount(BootTerminal);
@@ -47,7 +34,18 @@ describe('BootTerminal', () => {
     expect(wrapper.emitted('done')).toHaveLength(1);
   });
 
-  it('marks the session as played and starts fading out on Escape', async () => {
+  it('ignores the played flag while developing and plays anyway', async () => {
+    // 开发阶段开关开着（playWhileDeveloping=true）：即使会话里播过也要再播。
+    window.sessionStorage.setItem(SESSION_KEY, '1');
+
+    const wrapper = mount(BootTerminal);
+
+    await nextTick();
+
+    expect(wrapper.find('.boot-terminal').exists()).toBe(true);
+  });
+
+  it('starts fading out on Escape and does not write the played flag yet', async () => {
     const wrapper = mount(BootTerminal);
 
     await nextTick();
@@ -56,7 +54,8 @@ describe('BootTerminal', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     await nextTick();
 
-    expect(window.sessionStorage.getItem(SESSION_KEY)).toBe('1');
+    // 开发阶段不写记忆，否则下一次进入首页会被跳过、没法反复看效果。
+    expect(window.sessionStorage.getItem(SESSION_KEY)).toBeNull();
     expect(wrapper.find('.boot-terminal').classes()).toContain('is-leaving');
   });
 
@@ -67,7 +66,6 @@ describe('BootTerminal', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
     await nextTick();
 
-    expect(window.sessionStorage.getItem(SESSION_KEY)).toBe('1');
     expect(wrapper.find('.boot-terminal').classes()).toContain('is-leaving');
   });
 
@@ -77,11 +75,11 @@ describe('BootTerminal', () => {
     try {
       const wrapper = mount(BootTerminal);
 
-      // 跑完整段动画 + 出场淡出兜底，总时长 ~5.5s。
+      // 跑完整段动画 + 出场淡出兜底，总时长约 5 秒。
       await vi.advanceTimersByTimeAsync(6500);
 
       expect(wrapper.emitted('done')).toHaveLength(1);
-      expect(window.sessionStorage.getItem(SESSION_KEY)).toBe('1');
+      expect(window.sessionStorage.getItem(SESSION_KEY)).toBeNull();
     } finally {
       vi.useRealTimers();
     }
