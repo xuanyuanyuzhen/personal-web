@@ -38,6 +38,37 @@ const ENTER_ANIM_MS = 1600;
 // 出场淡出 600ms，兜底定时器留足余量，避免 transitionend 没触发时提前卸载。
 const EXIT_FALLBACK_MS = 800;
 
+// 背景科技线数量：纯装饰，数量克制以保持性能（transform/opacity 合成层动画）。
+const RAIN_COUNT = 16;
+
+type RainLine = {
+  dur: number;
+  x: number;
+  h: number;
+  delay: number;
+  up: boolean;
+  pink: boolean;
+  thick: boolean;
+};
+
+/**
+ * 生成背景光条配置：不规律地自上而下 / 自下而上滑动闪烁。
+ * 用固定公式生成（确定性，不依赖 Math.random，多次挂载不会抖动）：
+ * 约 1/3 自下而上（up），1/4 用站点粉色点缀（pink），少数加粗（thick）。
+ */
+function buildRainLines(): RainLine[] {
+  return Array.from({ length: RAIN_COUNT }, (_, i) => ({
+    x: Math.round(((i * 6.7 + 2) % 98) * 10) / 10,
+    h: 40 + ((i * 37) % 110),
+    dur: Math.round((1.8 + ((i * 0.53) % 1.9)) * 10) / 10,
+    // 负延迟：首帧即处于滑动中段，入场就有「已在下/左滑动的雨丝」
+    delay: -Math.round(((i * 0.83) % 4.2) * 10) / 10,
+    up: i % 3 === 1,
+    pink: i % 4 === 2,
+    thick: i % 5 === 0,
+  }));
+}
+
 const { t } = useI18n();
 
 const emit = defineEmits<{ done: []; leave: [] }>();
@@ -59,6 +90,7 @@ const rootEl = ref<HTMLElement | null>(null);
 const hideSkipHint = computed(() => lines.value.length >= 3);
 
 const script = computed(() => buildScript());
+const rainLines = computed(() => buildRainLines());
 
 let typeTimer: ReturnType<typeof setTimeout> | undefined;
 let frame: number | undefined;
@@ -376,6 +408,24 @@ function stopTimers() {
     @transitionend="handleTransitionEnd"
     @click="enterSite"
   >
+    <!-- 背景科技线：不规律上下滑动闪烁，纯装饰，不挡交互 -->
+    <div
+      class="boot-rain"
+      aria-hidden="true"
+    >
+      <span
+        v-for="(rain, index) in rainLines"
+        :key="index"
+        class="boot-rain-line"
+        :class="{ up: rain.up, pink: rain.pink, thick: rain.thick }"
+        :style="{
+          left: rain.x + '%',
+          height: rain.h + 'px',
+          '--dur': rain.dur + 's',
+          '--delay': rain.delay + 's',
+        }"
+      />
+    </div>
     <div
       class="boot-terminal-frame"
       role="document"

@@ -185,7 +185,7 @@ function handleScroll() {
     <PageLoadingSkeleton
       v-if="initialLoadPending && items.length === 0"
       variant="essays"
-      label="正在翻阅随笔…"
+      label="正在整理随笔…"
     />
 
     <div

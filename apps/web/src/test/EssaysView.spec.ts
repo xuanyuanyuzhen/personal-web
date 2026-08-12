@@ -106,7 +106,7 @@ describe('EssaysView', () => {
       global: { plugins: [router] },
     });
 
-    expect(wrapper.get('.content-skeleton-essays').attributes('aria-label')).toBe('正在翻阅随笔…');
+    expect(wrapper.get('.content-skeleton-essays').attributes('aria-label')).toBe('正在整理随笔…');
     expect(wrapper.find('.empty-state').exists()).toBe(false);
   });
 

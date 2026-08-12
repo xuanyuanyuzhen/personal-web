@@ -177,6 +177,14 @@ function startMove(id: number, event: PointerEvent) {
   startInteraction(id, 'move', event);
 }
 
+/** 点击画布空白处（落在任何照片瓦片之外）：取消当前选中，收起角度徽标和拖拽手柄。 */
+function clearSelectionOnEmptyPointer(event: PointerEvent) {
+  const target = event.target instanceof Element ? event.target : null;
+  if (!target?.closest('.photo-tile-interactive')) {
+    selectedPhotoId.value = null;
+  }
+}
+
 function startInteraction(id: number, mode: InteractionMode, event: PointerEvent) {
   const layout = layouts.value[id];
   const canvas = canvasRef.value;
@@ -343,6 +351,10 @@ function handleKeydown(id: number, event: KeyboardEvent) {
     nextLayout.width -= 12;
   } else if (event.key === '+' || event.key === '=') {
     nextLayout.width += 12;
+  } else if (event.key === 'Escape') {
+    event.preventDefault();
+    selectedPhotoId.value = null;
+    return;
   } else {
     return;
   }
@@ -361,6 +373,7 @@ function handleKeydown(id: number, event: KeyboardEvent) {
     :style="{ height: `${canvasHeight}px` }"
     role="group"
     aria-label="可自由排列的照片墙"
+    @pointerdown="clearSelectionOnEmptyPointer"
   >
     <p class="photo-canvas-hint">
       拖动照片调整位置，拖拽上方圆点旋转，拖拽右下角缩放。

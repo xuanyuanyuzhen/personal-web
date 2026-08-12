@@ -183,3 +183,16 @@ pnpm exec eslint apps/web/src --max-warnings=0
   短且随时可跳过，权衡后未加。若将来停留时间变长，需要补 focus trap。
 - 打字内容全部走 i18n；`terminal.whoami` 目前是「轩辕宇振」等硬编码译名，
   没有接后台设置里的名字。若要接 `publicName`，需要把 settings 数据提升到共享状态。
+
+---
+
+**视觉变更附注（2026-08）：** 站点整体重构为爱莉希雅主题后，`.boot-cursor` /
+`.boot-prompt-mark` 使用的新 `--accent`（`#e0568f`）自动跟随，但终端黑底绿字
+（`#070d08` / `#2ee46f`）是刻意保留的「技术感」对比，**不参与 token 换肤**。
+若后续调整终端配色，务必保持黑绿独立，详见 `doc/visual-redesign-handoff.md`。
+
+**背景科技线附注（同日）：** `.boot-rain` / `.boot-rain-line`（16 根细光条，绿主 + 站内粉点缀，
+`transform/opacity` 合成层动画，确定性公式生成不抖动）随终端整体淡出。⚠️ 底部
+`@media (prefers-reduced-motion: reduce)` 恢复块需同步恢复 `.boot-rain-line` 的
+`animation-duration: var(--dur)` 与 `animation-iteration-count: infinite`，否则
+（用户系统关闭「动画效果」时）光条会被全局减速规则压成 0.001ms 而不可见。

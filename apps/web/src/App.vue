@@ -176,6 +176,67 @@ function resolveRouteViewKey(activeRoute) {
           class="brand-mark"
           aria-hidden="true"
         > Y </span>
+        <!-- 品牌区的小蝴蝶装饰：爱莉希雅「粉色妖精」意象，纯内联 SVG 无色位图 -->
+        <svg
+          class="brand-butterfly"
+          aria-hidden="true"
+          viewBox="0 0 12 12"
+          width="15"
+          height="15"
+        >
+          <defs>
+            <linearGradient
+              id="brand-butterfly-grad"
+              x1="0"
+              y1="0"
+              x2="1"
+              y2="1"
+            >
+              <stop
+                offset="0"
+                stop-color="#e0568f"
+              />
+              <stop
+                offset="1"
+                stop-color="#e6c384"
+              />
+            </linearGradient>
+          </defs>
+          <path
+            fill="url(#brand-butterfly-grad)"
+            d="M5.9 5.9C4.5 3.9 2.9 2.6 1 1.8 2.4 5.2 4.2 6.4 5.9 5.9Z"
+          />
+          <path
+            fill="url(#brand-butterfly-grad)"
+            d="M6.1 5.9C7.5 3.9 9.1 2.6 11 1.8 9.6 5.2 7.8 6.4 6.1 5.9Z"
+          />
+          <path
+            fill="url(#brand-butterfly-grad)"
+            d="M5.9 6.1C3.9 7.2 2 8.9 0.6 10.2 2.8 10.6 4.9 8.8 5.9 6.1Z"
+          />
+          <path
+            fill="url(#brand-butterfly-grad)"
+            d="M6.1 6.1C8.1 7.2 10 8.9 11.4 10.2 9.2 10.6 7.1 8.8 6.1 6.1Z"
+          />
+          <path
+            fill="none"
+            stroke="#b93c6d"
+            stroke-width="0.5"
+            d="M6 5.6v3"
+          />
+          <path
+            fill="none"
+            stroke="#b93c6d"
+            stroke-width="0.4"
+            d="M5.9 5.4C5.6 4.4 4.9 3.5 4 2.9"
+          />
+          <path
+            fill="none"
+            stroke="#b93c6d"
+            stroke-width="0.4"
+            d="M6.1 5.4C6.4 4.4 7.1 3.5 8 2.9"
+          />
+        </svg>
         <span>
           {{ t('app.brand') }}
         </span>

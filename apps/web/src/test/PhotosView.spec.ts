@@ -1,4 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils';
+import { nextTick } from 'vue';
 import { setLocale } from '../composables/useI18n';
 import PhotosView from '../views/PhotosView.vue';
 
@@ -148,6 +149,31 @@ describe('PhotosView', () => {
     const beforeRotation = tile.attributes('style');
     await controls[1].trigger('click');
     expect(tile.attributes('style')).not.toBe(beforeRotation);
+  });
+
+  it('deselects a photo when clicking the canvas background or pressing Escape', async () => {
+    const wrapper = mount(PhotosView);
+    await flushPromises();
+
+    const tile = wrapper.get('.photo-tile-interactive');
+    await tile.trigger('focus');
+    expect(tile.findAll('.photo-card-control')).toHaveLength(3);
+    expect(tile.classes()).toContain('selected');
+
+    // 点击画布空白处（不在任何照片瓦片上）：取消选中，收起角度徽标与手柄
+    await wrapper.get('.photo-canvas').trigger('pointerdown');
+    await nextTick();
+    expect(tile.classes()).not.toContain('selected');
+    expect(tile.findAll('.photo-card-control')).toHaveLength(0);
+    expect(tile.find('.photo-rotate-handle').exists()).toBe(false);
+
+    // 重新选中后按 Escape：同样取消选中
+    await tile.trigger('focus');
+    expect(tile.classes()).toContain('selected');
+    await tile.trigger('keydown', { key: 'Escape' });
+    await nextTick();
+    expect(tile.classes()).not.toContain('selected');
+    expect(tile.findAll('.photo-card-control')).toHaveLength(0);
   });
 
   it('shows a retry action instead of an empty state when photos fail to load', async () => {

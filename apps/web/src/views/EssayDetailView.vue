@@ -75,7 +75,7 @@ async function toggleLike() {
     <p class="page-placeholder-eyebrow">
       随笔
     </p>
-    <h1>正在翻阅这篇随笔</h1>
+    <h1>正在整理这篇随笔…</h1>
     <PageLoadingSkeleton
       variant="article"
       label="正在整理正文…"
