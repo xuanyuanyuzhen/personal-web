@@ -72,6 +72,19 @@
 
 `.boot-terminal` 黑底 `#070d08` + 绿字 `#2ee46f` **刻意不参与换肤**，仍是品牌化的「技术感」对比；提示符/光标用 `--accent` 亮粉随主题微调。勿把终端配色纳入 token 体系。
 
+## 照片墙交互（取消选中）
+
+`InteractivePhotoCanvas.vue` 的照片瓦片原本被选中（`selectedPhotoId` 置为该照片 id）后，
+角度按钮、旋转/缩放手柄和选中高亮**永远无法收起**——因为代码没有取消选中的途径。
+已修复为一般交互逻辑：
+
+- **点击画布空白处**（落在任何 `.photo-tile-interactive` 之外）：清空 `selectedPhotoId`，
+  收起角度徽标与手柄；
+- **瓦片聚焦时按 Escape**：同样取消选中；
+- 点击照片本身、工具按钮、点赞按钮**不会**误取消；点另一张照片则切换选中。
+
+回归测试在 `test/PhotosView.spec.ts` 新增一条，锁定「点空白处」与「Escape」两种取消方式。
+
 ## 文案变更
 
 | 位置                                  | 现值                                                      | 新值                                                                     |
@@ -84,9 +97,10 @@
 
 - `apps/web/src/styles.css`（主体：tokens、书清理、卡片圆角、过渡、点缀）
 - `apps/web/src/App.vue`（品牌小蝴蝶 SVG）
+- `apps/web/src/components/InteractivePhotoCanvas.vue`（照片墙取消选中交互）
 - `apps/web/src/composables/useI18n.ts`（loading 文案）
 - `apps/web/src/views/EssayDetailView.vue`、`EssaysView.vue`（「翻阅」文案）
-- `apps/web/src/test/EssaysView.spec.ts`（aria-label 断言）
+- `apps/web/src/test/EssaysView.spec.ts`（aria-label 断言）、`test/PhotosView.spec.ts`（照片墙取消选中回归）
 - 文档：本文档、`page-transition-handoff.md`
 
 ## 验证命令
