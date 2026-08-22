@@ -10,9 +10,15 @@
 
 ## 1. 背景与目标
 
-### 1.1 现状
+### 1.1 现状（写作当时，**现已全部删除**）
 
-当前实现由 Vue Router 导航守卫驱动：
+> ⚠️ 以下「当前实现」指本文写作当时的旧翻页代码。这些文件与样式**均已从仓库移除**：
+> `usePageFlip.ts`、`usePageTurnSnapshot.ts`、`PageFlip.spec.ts`、`PageTurnSnapshot.spec.ts`、
+> 全部 `.page-turn-*` / `--page-flip-*` / `page-curl-*` keyframes。
+> 已核实 `apps/web/src/styles.css` 与 `apps/web/src` 中 0 处残留，**不要按下表去找文件或恢复它们**。
+> 现行方案见 `doc/page-transition-handoff.md`。
+
+写作当时的实现由 Vue Router 导航守卫驱动：
 
 1. `beforeEach`：按导航顺序判定 `forward` / `backward`，克隆**旧页**为 `.page-turn-front-snapshot`
 2. 路由组件在 `RouterView` 中直接替换
@@ -24,13 +30,13 @@
 
 相关代码：
 
-| 文件                                              | 职责                                    |
-| ------------------------------------------------- | --------------------------------------- |
-| `apps/web/src/composables/usePageFlip.ts`         | 导航顺序、方向、时长、session 清理      |
-| `apps/web/src/composables/usePageTurnSnapshot.ts` | 旧页克隆、折痕层、清理                  |
-| `apps/web/src/router.ts`                          | beforeEach / afterEach 接线             |
-| `apps/web/src/styles.css`                         | 快照样式与 keyframes                    |
-| `doc/page-flip-animation-handoff.md`              | 历史 4 层卷页设计（与运行时代码已脱节） |
+| 文件                                              | 职责                                                  |
+| ------------------------------------------------- | ----------------------------------------------------- |
+| `apps/web/src/composables/usePageFlip.ts`         | 导航顺序、方向、时长、session 清理                    |
+| `apps/web/src/composables/usePageTurnSnapshot.ts` | 旧页克隆、折痕层、清理                                |
+| `apps/web/src/router.ts`                          | beforeEach / afterEach 接线                           |
+| `apps/web/src/styles.css`                         | 快照样式与 keyframes                                  |
+| `doc/page-flip-animation-handoff.md`              | 历史 4 层卷页设计（**该文档也已删除，仓库中不存在**） |
 
 ### 1.2 主要痛点
 

@@ -228,5 +228,5 @@ pnpm dev
 4. **完善自定义页面/导航预览流程**：已有 `X-Admin-Preview`，后续要确保后台编辑页跳转前台预览时 cookie 和 header 链路稳定。
 5. **强化审核与反垃圾**：禁词 `REGEX_RESERVED` 目前是保留类型，黑名单和禁词规则可继续扩展频控、IP 段、正则规则和后台提示。
 6. **补安全配置**：生产前必须替换 `JWT_SECRET`、默认管理员密码，并确认上传目录权限、文件 MIME/扩展名校验和静态资源暴露策略。
-7. **保持翻页动画回归测试**：新增一级导航页面时，同步更新 `apps/web/src/composables/usePageFlip.ts` 的 `pageOrder` 和 `pagePathOrder`，否则不会触发翻页动画。
-8. **回归验证命令**：常规提交前执行 `pnpm lint`、`pnpm test`、`pnpm build`；只验证前台翻页可执行 `pnpm --filter @yuer/web test -- PageFlip.spec.ts`。
+7. **页面切换动画无需逐页注册**：⚠️ 本条原先要求「新增一级导航页面时同步更新 `usePageFlip.ts` 的 `pageOrder` / `pagePathOrder`」，**该要求已废弃**。3D 书页翻页连同 `usePageFlip.ts`、`usePageTurnSnapshot.ts` 已整体删除，现在由 `App.vue` 里包裹 `RouterView` 的全局 `Transition`（`name="page-shift"`）统一处理，新增页面自动生效、不必登记顺序。详见 `doc/page-transition-handoff.md`。
+8. **回归验证命令**：常规提交前执行 `pnpm lint`、`pnpm test`、`pnpm build`；~~`PageFlip.spec.ts`~~ 已随翻页动画删除，前台过渡的结构契约现在由 `pnpm --filter @yuer/web test -- AppShell.spec.ts` 覆盖。

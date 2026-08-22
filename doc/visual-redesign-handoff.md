@@ -2,6 +2,10 @@
 
 > 状态：已实现（分支 `feat/ui-elysia-theme-CC`）
 > 范围：仅 `apps/web` 前台视觉层；后台 / API 不改，开屏终端黑绿配色刻意独立不换肤
+>
+> ⚠️ 「书」主题（书皮侧边条 / 稿纸横线 / 纸页文案）与「3D 书页翻页」动画**均已废弃并删代码**，
+> 见下方「书主题删除清单（不得恢复）」；翻页部分的现行替代方案见 `doc/page-transition-handoff.md`，
+> 旧 3D 翻页设计仅作存档留在 `doc/page-flip-3d-optimization.md`。
 
 ## 目的
 
