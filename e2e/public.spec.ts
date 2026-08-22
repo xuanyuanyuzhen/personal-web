@@ -38,9 +38,12 @@ test('visitor can like the site and search public content', async ({ page }) => 
   let likeToggleCount = 0;
   await page.route('**/api/likes/toggle', async (route) => {
     likeToggleCount += 1;
-    await route.fulfill({ json: { likeCount: likeToggleCount === 1 ? 8 : 7, liked: likeToggleCount === 1 } });
+    await route.fulfill({
+      json: { likeCount: likeToggleCount === 1 ? 8 : 7, liked: likeToggleCount === 1 },
+    });
   });
   await page.goto('/');
+  await enterThroughBootTerminal(page);
 
   await page.getByRole('button', { name: /Like this site/ }).click();
   await expect(page.getByRole('button', { name: /Liked this site/ })).toBeVisible();
@@ -55,6 +58,27 @@ test('visitor can like the site and search public content', async ({ page }) => 
   await expect(page.getByText('Spring Essay')).toBeVisible();
   await expect(page.getByText('Spring Photo')).toBeVisible();
 });
+
+// 开屏终端(BootTerminal)开发期每次进入首页都会播放并等待输入,像真实用户一样
+// 「回车跳过打字 → 点击屏幕进入」,等它整个卸载后再操作首页。
+// 注意 click 必须带短 timeout:终端随时可能卸载,默认 30s 的 locator 等待会卡满全场。
+async function enterThroughBootTerminal(page: Page) {
+  const terminal = page.locator('.boot-terminal');
+  if (!(await terminal.count())) {
+    return;
+  }
+
+  await page.keyboard.press('Enter');
+  await terminal.click({ force: true, timeout: 2000 }).catch(() => undefined);
+  try {
+    await terminal.waitFor({ state: 'detached', timeout: 8000 });
+  } catch {
+    // 兜底:点击可能落在 scriptDone 置位之前,再补一轮跳过 + 进入。
+    await page.keyboard.press('Enter').catch(() => undefined);
+    await terminal.click({ force: true, timeout: 1000 }).catch(() => undefined);
+    await terminal.waitFor({ state: 'detached', timeout: 8000 });
+  }
+}
 
 async function mockPublicShell(page: Page) {
   await page.route('**/api/navigations/public', async (route) => {

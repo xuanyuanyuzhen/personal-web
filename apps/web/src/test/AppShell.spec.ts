@@ -234,7 +234,8 @@ describe('App shell', () => {
     expect(wrapper.find('a[href="/pages/garden"]').exists()).toBe(true);
   });
 
-  it('reopens the home announcement from the header action', async () => {
+  it('shows the home announcement permanently, with no header toggle', async () => {
+    // 欢迎语不再可关闭，因此头部那颗「重新打开公告」的 i 按钮也一并移除了。
     vi.mocked(fetch).mockImplementation((input: URL | RequestInfo) => {
       const url = requestUrl(input);
 
@@ -282,14 +283,8 @@ describe('App shell', () => {
 
     await flushPromises();
     expect(wrapper.find('.notice-strip').exists()).toBe(true);
-
-    await wrapper.get('.notice-strip-header button').trigger('click');
-    await nextTick();
-    expect(wrapper.find('.notice-strip').exists()).toBe(false);
-
-    await wrapper.get('.announcement-toggle').trigger('click');
-    await nextTick();
-    expect(wrapper.find('.notice-strip').exists()).toBe(true);
+    expect(wrapper.find('.notice-strip-header button').exists()).toBe(false);
+    expect(wrapper.find('.announcement-toggle').exists()).toBe(false);
   });
 
   it('renders and toggles mobile navigation', async () => {

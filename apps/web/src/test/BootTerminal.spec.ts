@@ -16,10 +16,11 @@ describe('BootTerminal', () => {
     vi.unstubAllGlobals();
   });
 
-  it('plays anyway under prefers-reduced-motion while developing', async () => {
-    // 开发阶段（playWhileDeveloping=true）：无视 reduced-motion，保证开发者
-    // 能反复查看效果。⚠️ 曾因 Windows 关闭「动画效果」导致真实浏览器
-    // prefers-reduced-motion 为 reduce，旧逻辑直接跳过、用户完全看不到动画。
+  it('plays anyway under prefers-reduced-motion (respectReducedMotion=false)', async () => {
+    // 无障碍开关当前关着：无视 reduced-motion 照常播放。
+    // ⚠️ 本机 Windows 关了「动画效果」，真实 Chrome 里 prefers-reduced-motion 就是 reduce，
+    // 如果把它和「只播一次」合成一个开关，一翻就变成「一次都不播」。
+    // 上线前把 respectReducedMotion 改成 true，届时这条断言要改为「不挂载 + emit done」。
     vi.stubGlobal(
       'matchMedia',
       vi.fn().mockReturnValue({
@@ -33,20 +34,19 @@ describe('BootTerminal', () => {
 
     await nextTick();
 
-    // 定稿后（playWhileDeveloping=false）应恢复为：跳过不播、
-    // `.boot-terminal` 不存在、emit('done') 一次。
     expect(wrapper.find('.boot-terminal').exists()).toBe(true);
   });
 
-  it('ignores the played flag while developing and plays anyway', async () => {
-    // 开发阶段开关开着（playWhileDeveloping=true）：即使会话里播过也要再播。
+  it('skips the whole terminal when this session already played it', async () => {
+    // replayEveryVisit=false：同一会话只播一次，之后直接进首页（方便调试首页内容）。
     window.sessionStorage.setItem(SESSION_KEY, '1');
 
     const wrapper = mount(BootTerminal);
 
     await nextTick();
 
-    expect(wrapper.find('.boot-terminal').exists()).toBe(true);
+    expect(wrapper.find('.boot-terminal').exists()).toBe(false);
+    expect(wrapper.emitted('done')).toHaveLength(1);
   });
 
   it('fast-forwards the typing on Escape and lands at the waiting prompt', async () => {
@@ -106,7 +106,8 @@ describe('BootTerminal', () => {
       expect(wrapper.emitted('done')).toHaveLength(1);
       // 开始淡出时通知 App 触发首页上浮转场。
       expect(wrapper.emitted('leave')).toHaveLength(1);
-      expect(window.sessionStorage.getItem(SESSION_KEY)).toBeNull();
+      // 播完写会话记忆：本会话后续进首页直接跳过终端。
+      expect(window.sessionStorage.getItem(SESSION_KEY)).toBe('1');
     } finally {
       vi.useRealTimers();
     }

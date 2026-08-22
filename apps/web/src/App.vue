@@ -20,7 +20,6 @@ const { isDark, toggleTheme } = useTheme();
 const { locale, localeLabels, setLocale, t } = useI18n();
 
 const apiNavigation = ref(null);
-const announcementAvailable = ref(false);
 const mobileMenuOpen = ref(false);
 const searchOpen = ref(false);
 const isPreview = ref(readPreviewMode());
@@ -45,7 +44,6 @@ getVisitorId();
 
 onMounted(() => {
   loadPublicNavigation();
-  loadAnnouncementAvailability();
   recordCurrentVisit();
 });
 
@@ -87,18 +85,6 @@ async function loadPublicNavigation() {
   } catch {
     apiNavigation.value = null;
   }
-}
-
-async function loadAnnouncementAvailability() {
-  try {
-    announcementAvailable.value = Boolean(await publicApi.getAnnouncement());
-  } catch {
-    announcementAvailable.value = false;
-  }
-}
-
-function openAnnouncement() {
-  window.dispatchEvent(new CustomEvent('open-site-announcement'));
 }
 
 function recordCurrentVisit() {
@@ -288,16 +274,6 @@ function resolveRouteViewKey(activeRoute) {
         >
           <span aria-hidden="true">{{ isDark ? 'Moon' : 'Sun' }}</span>
           {{ themeLabel }}
-        </button>
-
-        <button
-          v-if="announcementAvailable"
-          class="announcement-toggle"
-          type="button"
-          aria-label="查看公告"
-          @click="openAnnouncement"
-        >
-          <span aria-hidden="true">i</span>
         </button>
 
         <button

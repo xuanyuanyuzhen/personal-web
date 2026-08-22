@@ -9,24 +9,36 @@ import { useI18n } from '../composables/useI18n';
  * - 黑底绿字，提示符和光标用站点粉色点缀；
  * - 伪命令行一问一答，最后一行落到站点标语；
  * - 打字阶段按回车 / Esc 跳过剩余文字（直接落到「等待输入」提示符，
- *   不会直接进入页面），尊重 prefers-reduced-motion（定稿后生效；
- *   开发阶段无视它，保证能反复查看效果）；
- * - 开发阶段每次进首页都播放（方便反复查看效果）：
- *   见下方 `playWhileDeveloping`，确认效果后改为 false，恢复一次性播放
- *   （届时重新启用 sessionStorage 记忆 key `yuer.boot.played`）；
+ *   不会直接进入页面）；
  * - 全部文字打完后停在终端，出现 `$` 提示符 + 闪烁光标等待输入；
  *   可真实敲入命令（如 clear），回车或点击屏幕进入；
  *   进入时进度条填充，满则整体淡出露出首页。
+ *
+ * 播放时机由下面两个开关控制，见 `replayEveryVisit` / `respectReducedMotion`。
  */
 
 const SESSION_KEY = 'yuer.boot.played';
 
 /**
- * 开发调试开关：true 时每次进入首页都播放，跳过时不写记忆。
- * 待开屏动画定稿（用户确认不再改动）后改回 false：
- * 将恢复「同一浏览器会话只播一次」。
+ * 是否每次进首页都重播。
+ * - `true`：调试开屏动画本身时用，刷新就能再看一遍；
+ * - `false`（当前）：同一浏览器会话只播一次，之后刷新直接进首页 ——
+ *   调试首页内容时用。想再看一次：关掉标签页重开，或在 DevTools
+ *   Application → Session Storage 删掉 `yuer.boot.played`。
  */
-const playWhileDeveloping = true;
+const replayEveryVisit = false;
+
+/**
+ * 是否尊重系统的「减少动态效果」（prefers-reduced-motion: reduce）。
+ * - `false`（当前）：无视该设置照常播放；
+ * - `true`：开了减少动态效果就整段跳过（不挂载、不播）。**上线前必须改回 true。**
+ *
+ * ⚠️ 这两个开关以前是合成一个的（`playWhileDeveloping`），结果「改成只播一次」
+ * 会连带把无障碍跳过一起打开。本机 Windows 关了「动画效果」，真实 Chrome 里
+ * prefers-reduced-motion 就是 reduce —— 合成一个开关时一翻就变成「一次都不播」，
+ * 而不是「只播一次」。所以刻意拆成两个，别再合回去。
+ */
+const respectReducedMotion = false;
 
 // 打字节奏：20→10 fps 偏快（用户反馈），放慢为 12→7 fps，行间停顿也加长一点。
 const INITIAL_FPS = 12;
@@ -104,20 +116,16 @@ onMounted(() => {
     typeof window.matchMedia === 'function' &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // 开发调试阶段：无视 reduced-motion，确保开发者能反复查看动画效果。
-  // ⚠️ 曾遇到真实环境「刷新看不到动画」：Windows 系统关了「动画效果」
-  // 后，真实浏览器 prefers-reduced-motion 为 reduce，旧逻辑直接跳过不播。
-  // 定稿后（playWhileDeveloping=false）恢复无障碍行为：系统/浏览器开启
-  // 「减少动态效果」时跳过不播。
-  if (!playWhileDeveloping && prefersReducedMotion) {
+  // 无障碍：开了「减少动态效果」就整段跳过（当前 respectReducedMotion=false，
+  // 即照常播放；上线前把它改成 true）。
+  if (respectReducedMotion && prefersReducedMotion) {
     isVisible.value = false;
     emit('done');
     return;
   }
 
-  // 开发调试阶段：不读 sessionStorage 记忆，每次进入首页都播放。
-  // 定稿后 `playWhileDeveloping = false`，这里恢复读记忆并跳过已播放的会话。
-  if (!playWhileDeveloping && sessionStorage.getItem(SESSION_KEY) === '1') {
+  // 同一浏览器会话只播一次：播过就直接进首页，方便调试首页内容。
+  if (!replayEveryVisit && sessionStorage.getItem(SESSION_KEY) === '1') {
     isVisible.value = false;
     emit('done');
     return;
@@ -371,9 +379,9 @@ function handleTransitionEnd(event: TransitionEvent) {
   }
 }
 
-/** 播放完成 / 被跳过时写入会话记忆。仅定稿后（playWhileDeveloping=false）生效。 */
+/** 播放完成（开始淡出）时写入会话记忆；replayEveryVisit=true 时不写。 */
 function markPlayed() {
-  if (playWhileDeveloping) {
+  if (replayEveryVisit) {
     return;
   }
 
