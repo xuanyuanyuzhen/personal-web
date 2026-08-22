@@ -124,9 +124,6 @@ function handleScroll() {
     class="thoughts-page"
     aria-labelledby="thoughts-title"
   >
-    <p class="page-placeholder-eyebrow">
-      {{ t('nav.thoughts') }}
-    </p>
     <h1 id="thoughts-title">
       {{ t('page.thoughts.title') }}
     </h1>

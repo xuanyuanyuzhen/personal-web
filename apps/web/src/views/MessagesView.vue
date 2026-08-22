@@ -145,15 +145,12 @@ function avatarText(message: PublicMessage) {
     class="messages-page"
     aria-labelledby="messages-title"
   >
-    <p class="page-placeholder-eyebrow">
-      {{ t('nav.messages') }}
-    </p>
     <h1 id="messages-title">
       {{ t('page.messages.title') }}
     </h1>
-    <p class="summary">
+    <!-- <p class="summary">
       {{ t('page.messages.body') }}
-    </p>
+    </p> -->
 
     <form
       class="message-form"

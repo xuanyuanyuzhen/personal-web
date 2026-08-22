@@ -204,9 +204,6 @@ function restorePreviewState(restoreFocus: boolean) {
       :aria-hidden="previewPhoto ? 'true' : undefined"
       :inert="previewPhoto ? true : undefined"
     >
-      <p class="page-placeholder-eyebrow">
-        {{ t('nav.photos') }}
-      </p>
       <h1 id="photos-title">
         {{ t('page.photos.title') }}
       </h1>
