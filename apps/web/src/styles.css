@@ -2,10 +2,35 @@
   --accent: #e0568f;
   --accent-strong: #b93c6d;
   --bg: #fbf3f8;
+
+  /* 站点背景图：默认无图。放图步骤见 apps/web/public/bg/README.md —
+     把图片丢进 apps/web/public/bg/，然后把 none 换成 url('/bg/你的文件名.jpg')。
+     ⚠️ 必须用 `/bg/...` 这种绝对路径：public 目录是原样复制的，写成
+     `../public/bg/...` 相对路径虽然 dev 下能显示，但打包时 Vite 会把它当模块资源
+     再复制一份（产物里同一张图出现两次，且路径带 hash）。 */
+  --bg-image: url('/bg/home.jpg');
+
+  /* 底色蒙版的不透明度：100% = 纯色背景（无背景图时的原样）；
+     数值越低，背景图越清晰、毛玻璃层次越明显。 */
+  --bg-veil: 50%;
+
+  /* 全屏磨砂强度：整张背景图被虚化的程度。
+     0 = 背景图完全清晰；12px 左右能保留照片轮廓又有磨砂感；调到 20px+ 就基本只剩色块。 */
+  --bg-blur: 1px;
+
+  /* 首页时钟表盘的底图：默认 none（显示自带的一圈淡色刻度）。
+     把图片丢进 apps/web/public/bg/ 后改成 url('/bg/clock-face.png')，
+     同样必须是 `/bg/...` 绝对路径。建议用正方形、主体居中的图。 */
+  --clock-face-image: url('/bg/clock.jpg');
   --bg-aura:
     radial-gradient(900px 640px at 12% -8%, rgb(240 130 178 / 20%), transparent 60%),
     radial-gradient(1000px 700px at 88% 10%, rgb(250 208 137 / 12%), transparent 55%),
-    linear-gradient(180deg, var(--bg), var(--bg-soft) 42%, var(--bg));
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--bg) var(--bg-veil), transparent),
+      color-mix(in srgb, var(--bg-soft) var(--bg-veil), transparent) 42%,
+      color-mix(in srgb, var(--bg) var(--bg-veil), transparent)
+    );
   --bg-soft: #fde8f2;
   --border: #f3d5e3;
   --card: rgb(255 255 255 / 78%);
@@ -31,10 +56,22 @@
   --accent: #f2a0bd;
   --accent-strong: #ffd2df;
   --bg: #251a28;
+
+  /* 暗色主题可以换另一张背景图（留空则不显示背景图，只剩纯色）。 */
+  --bg-image: url('/bg/home.jpg');
+  --bg-veil: 40%;
+
+  /* 表盘底图同理，可以给暗色单独换一张。 */
+  --clock-face-image: url('/bg/clock.jpg');
   --bg-aura:
     radial-gradient(900px 640px at 12% -8%, rgb(150 66 102 / 34%), transparent 60%),
     radial-gradient(1000px 700px at 88% 10%, rgb(122 88 44 / 20%), transparent 55%),
-    linear-gradient(180deg, var(--bg), var(--bg-soft) 42%, var(--bg));
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--bg) var(--bg-veil), transparent),
+      color-mix(in srgb, var(--bg-soft) var(--bg-veil), transparent) 42%,
+      color-mix(in srgb, var(--bg) var(--bg-veil), transparent)
+    );
   --bg-soft: #33222f;
   --border: #5d4350;
   --card: rgb(62 42 57 / 86%);
@@ -48,8 +85,14 @@
   color-scheme: dark;
 }
 
+/* 背景图挂在 body 上（fixed：滚动时不动），磨砂由上层的 .site-shell::before 统一做。 */
 body {
   background: var(--bg);
+  background-attachment: fixed;
+  background-image: var(--bg-image);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
   margin: 0;
   min-width: 320px;
 }
@@ -81,24 +124,34 @@ a {
   width: 1px;
 }
 
+/* 背景分两层：上层是 --bg-aura 粉调光晕 + 底色蒙版（蒙版透明度由 --bg-veil 控制），
+   下层是站点背景图 --bg-image（fixed，滚动时不动，毛玻璃才有稳定的虚化对象）。 */
 .site-shell {
-  background: var(--bg-aura);
   color: var(--ink);
   min-height: 100vh;
   overflow-x: clip;
 }
 
-/* 底部金色落日光晕（书皮条已移除，伪元素改作氛围装饰；pointer-events 关闭，不挡交互） */
+/* ============================================================
+   全屏磨砂蒙版：整张背景图都被虚化，而不是只在内容区局部开一块毛玻璃。
+   - backdrop-filter 虚化的是它背后的 body 背景图；
+   - background 叠了粉调光晕 + 底色蒙版（透明度由 --bg-veil 控制）+ 底部金色落日光晕；
+   - fixed + z-index 0 + pointer-events: none：铺满视口、不挡交互、正文永远画在它之上。
+   ⚠️ backdrop-filter 只能加在这个伪元素上，不能加到 .site-shell 本身：
+   那会让 .site-shell 变成 fixed 后代的包含块，音乐播放器 / 看板娘 / 开屏终端
+   会跟着页面一起滚动。
+   ============================================================ */
 .site-shell::before {
+  backdrop-filter: blur(var(--bg-blur)) saturate(125%);
   background:
     radial-gradient(
       60% 120px at 50% 100%,
       color-mix(in srgb, var(--gold) 16%, transparent),
       transparent 70%
-    );
+    ),
+    var(--bg-aura);
   content: '';
-  height: 160px;
-  inset: auto 0 0;
+  inset: 0;
   pointer-events: none;
   position: fixed;
   z-index: 0;
@@ -291,10 +344,12 @@ a {
   }
 }
 
+/* 双层毛玻璃之一（较实的一层）：导航栏磨砂更强、透出更少背景；
+   与之对应的 .home-panel 是更透明的一层，两层强度刻意拉开。 */
 .site-header {
   align-items: center;
-  backdrop-filter: blur(16px);
-  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(20px) saturate(140%);
+  background: color-mix(in srgb, var(--bg) 76%, transparent);
   border-bottom: 1px solid var(--border);
   box-sizing: border-box;
   display: flex;
@@ -458,26 +513,6 @@ a {
   font-size: 12px;
 }
 
-.announcement-toggle {
-  align-items: center;
-  display: inline-flex;
-  justify-content: center;
-  width: 42px;
-}
-
-.announcement-toggle span {
-  align-items: center;
-  border: 1px solid currentcolor;
-  border-radius: 999px;
-  display: inline-flex;
-  font-size: 12px;
-  font-weight: 800;
-  height: 16px;
-  justify-content: center;
-  line-height: 1;
-  width: 16px;
-}
-
 .menu-toggle {
   display: none;
 }
@@ -590,16 +625,14 @@ a {
 }
 
 .home-view {
-  align-items: center;
   display: grid;
-  gap: 40px;
-  grid-template-columns: minmax(0, 760px);
-  min-height: calc(100vh - 96px);
-  padding: 48px 0;
+  grid-template-columns: minmax(0, 1fr);
+  padding: 36px 0 56px;
   position: relative;
 }
 
-/* 首页右上角的水晶棱镜装饰（菱形 + 粉金渐变 + 微光，纯静态） */
+/* 首页右上角的水晶棱镜装饰（菱形 + 粉金渐变 + 微光，纯静态）。
+   刻意骑在 .home-panel 上边缘：一半在毛玻璃后被虚化、一半清晰，凸显玻璃质感。 */
 .home-view::after {
   background: linear-gradient(
     135deg,
@@ -615,8 +648,8 @@ a {
   opacity: 0.75;
   pointer-events: none;
   position: absolute;
-  right: 48px;
-  top: 96px;
+  right: 26px;
+  top: 4px;
   transform: rotate(45deg);
   width: 72px;
   z-index: 0;
@@ -629,14 +662,527 @@ a {
     transparent 70%
   );
   content: '';
-  height: 160px;
-  opacity: 0.4;
+  height: 180px;
+  opacity: 0.5;
   pointer-events: none;
   position: absolute;
-  right: 12px;
-  top: 56px;
-  width: 240px;
+  right: -8px;
+  top: -8px;
+  width: 280px;
   z-index: 0;
+}
+
+/* ============================================================
+   首页仪表盘：占满整栏的内容面板。
+   磨砂已经由全屏蒙版（.site-shell::before）统一提供，这里**完全不做视觉**：
+   没有 backdrop-filter、没有底色、没有边框和阴影 —— 用户定稿要求面板本身隐形，
+   靠内部各张 .home-card 自己的底色和圆角划分区域。
+   再给它加 background / border / box-shadow 都会和背景磨砂打架、让这一块发灰。
+   这里只剩布局职责（栅格 + 内边距 + 盖在磨砂层之上的 z-index）。
+   ============================================================ */
+.home-panel {
+  border-radius: var(--radius-lg);
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  position: relative;
+  z-index: 1;
+}
+
+/* 内容卡：同样不叠加毛玻璃，用比面板更实的底色保证正文对比度。 */
+.home-card {
+  background: color-mix(in srgb, var(--surface) 58%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: var(--radius-md);
+  box-sizing: border-box;
+  padding: 12px 18px 16px;
+}
+
+.home-card-eyebrow {
+  align-items: center;
+  color: var(--accent-strong);
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 700;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+
+.home-card-eyebrow::after {
+  background: linear-gradient(90deg, var(--muted), transparent);
+  border-radius: 999px;
+  content: '';
+  height: 2px;
+  width: 50px;
+}
+
+.home-row-top {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1.9fr) minmax(0, 1fr);
+}
+
+.home-row-middle {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.home-stack {
+  display: grid;
+  gap: 16px;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.home-row-mini {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+
+  /* 保证照片卡有基础高度，同时其内部 overflow: hidden 兜住溢出。 */
+  min-height: 152px;
+}
+
+/* --- 今日拾语（HomeQuote.vue：直接显示，无打字机） ---
+   容器预留固定高度：一句从一行变两行时页面不会跟着抖。 */
+.home-quote {
+  min-height: 108px;
+  position: relative;
+}
+
+.home-quote-body {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  width: 100%;
+}
+
+.home-quote-text {
+  align-content: center;
+  color: var(--ink);
+  display: grid;
+  font-size: 21px;
+  font-weight: 600;
+  gap: 2px;
+  line-height: 1.75;
+  margin: 0;
+
+  /* 两行文字的高度，始终预留。 */
+  min-height: 3.5em;
+  text-wrap: pretty;
+}
+
+/* 有逗号的长句拆成两段：上句左上、下句右下，读起来像对仗。 */
+.home-quote-tail {
+  justify-self: end;
+  text-align: right;
+}
+
+.home-quote-author {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+  text-align: right;
+}
+
+/* 换句时淡入淡出：离场元素脱离文档流，避免 out-in 造成的高度塌陷。 */
+.quote-fade-enter-active,
+.quote-fade-leave-active {
+  transition: opacity 420ms ease;
+}
+
+.quote-fade-leave-active {
+  inset: 0 0 auto;
+  position: absolute;
+}
+
+.quote-fade-enter-from,
+.quote-fade-leave-to {
+  opacity: 0;
+}
+
+/* --- 时钟卡：左边数字时间，右边表盘 --- */
+.home-clock {
+  align-items: center;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: auto auto;
+  user-select: none;
+}
+
+.home-clock-readout {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.home-clock-time {
+  align-items: baseline;
+  color: var(--ink);
+  display: inline-flex;
+  font-size: 36px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.home-clock-colon {
+  color: var(--accent);
+  padding-inline: 2px;
+}
+
+.home-clock-seconds {
+  color: var(--accent-strong);
+  font-size: 30px;
+}
+
+/* 表盘：底图由 --clock-face-image 提供（放 apps/web/public/bg/，见该目录 README）。
+   没设图时用下面这层内联 SVG 刻度当默认表盘；设了图后图铺在刻度之上把它盖住。 */
+.home-clock-dial {
+  aspect-ratio: 1;
+  background-color: color-mix(in srgb, var(--surface) 46%, transparent);
+  background-image:
+    var(--clock-face-image),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg stroke='%23b93c6d' stroke-linecap='round' opacity='0.42'%3E%3Cg stroke-width='2.2'%3E%3Cline x1='50' y1='6' x2='50' y2='15'/%3E%3Cline x1='50' y1='6' x2='50' y2='15' transform='rotate(90 50 50)'/%3E%3Cline x1='50' y1='6' x2='50' y2='15' transform='rotate(180 50 50)'/%3E%3Cline x1='50' y1='6' x2='50' y2='15' transform='rotate(270 50 50)'/%3E%3C/g%3E%3Cg stroke-width='1.4'%3E%3Cline x1='50' y1='7' x2='50' y2='12' transform='rotate(30 50 50)'/%3E%3Cline x1='50' y1='7' x2='50' y2='12' transform='rotate(60 50 50)'/%3E%3Cline x1='50' y1='7' x2='50' y2='12' transform='rotate(120 50 50)'/%3E%3Cline x1='50' y1='7' x2='50' y2='12' transform='rotate(150 50 50)'/%3E%3Cline x1='50' y1='7' x2='50' y2='12' transform='rotate(210 50 50)'/%3E%3Cline x1='50' y1='7' x2='50' y2='12' transform='rotate(240 50 50)'/%3E%3Cline x1='50' y1='7' x2='50' y2='12' transform='rotate(300 50 50)'/%3E%3Cline x1='50' y1='7' x2='50' y2='12' transform='rotate(330 50 50)'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  border: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
+  border-radius: 999px;
+  box-shadow: inset 0 1px 12px color-mix(in srgb, var(--accent) 12%, transparent);
+  flex: none;
+  position: relative;
+  width: 120px;
+}
+
+/* 指针：底端锚在表盘圆心，绕自身底端旋转（角度由组件按当前时间算）。 */
+.home-clock-hand {
+  border-radius: 999px;
+  bottom: 50%;
+  left: 50%;
+  position: absolute;
+  transform-origin: 50% 100%;
+}
+
+.home-clock-hand-hour {
+  background: white;
+  height: 26%;
+  width: 4px;
+}
+
+.home-clock-hand-minute {
+  background: #b93c6d;
+  height: 35%;
+  width: 3px;
+}
+
+.home-clock-hand-second {
+  background: #e0568f;
+  height: 41%;
+  width: 2px;
+}
+
+.home-clock-pin {
+  background: #b93c6d;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  height: 5px;
+  left: 50%;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 5px;
+}
+
+.home-clock-date {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+}
+
+/* --- 通用轮播（随笔轮播图 / 照片墙） --- */
+.home-carousel-card {
+  min-height: 340px;
+  overflow: hidden;
+  padding: 0;
+  position: relative;
+}
+
+.home-carousel {
+  height: 100%;
+  position: relative;
+}
+
+.home-carousel-slide {
+  background-color: var(--bg-soft);
+  background-position: center;
+  background-size: cover;
+  border-radius: inherit;
+  display: flex;
+  align-items: flex-end;
+  inset: 0;
+  overflow: hidden;
+  position: absolute;
+}
+
+.home-carousel-slide.is-placeholder {
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent) 30%, var(--bg-soft)),
+    color-mix(in srgb, var(--gold) 34%, var(--bg-soft)) 72%
+  );
+}
+
+/* 底部深色渐隐，保证叠加文字在任何图片上可读；暖白字不参与换肤。 */
+.home-carousel-slide::before {
+  background: linear-gradient(180deg, transparent 42%, rgb(31 10 22 / 66%));
+  content: '';
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+}
+
+.home-carousel-copy {
+  color: #fff7fa;
+  display: grid;
+  gap: 4px;
+  padding: 16px 18px;
+  position: relative;
+}
+
+.home-carousel-copy strong {
+  font-size: 18px;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+.home-carousel-copy span {
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.home-carousel-dots {
+  bottom: 12px;
+  display: flex;
+  gap: 6px;
+  inset-inline: 0;
+  justify-content: center;
+  position: absolute;
+  z-index: 1;
+}
+
+.home-carousel-dot {
+  background: rgb(255 247 250 / 55%);
+  border: 0;
+  border-radius: 999px;
+  height: 8px;
+  padding: 0;
+  transition:
+    background-color 180ms ease,
+    width 180ms ease;
+  width: 8px;
+}
+
+.home-carousel-dot.is-active {
+  background: var(--accent);
+  width: 20px;
+}
+
+.home-carousel-empty {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  font-size: 14px;
+  font-weight: 600;
+  height: 100%;
+  justify-content: center;
+  margin: 0;
+}
+
+.carousel-fade-enter-active,
+.carousel-fade-leave-active {
+  transition: opacity 480ms ease;
+}
+
+.carousel-fade-enter-from,
+.carousel-fade-leave-to {
+  opacity: 0;
+}
+
+/* --- 最新随笔卡（封面为背景，文字压底） --- */
+.home-latest-card {
+  background-color: color-mix(in srgb, var(--surface) 58%, transparent);
+  background-position: center;
+  background-size: cover;
+  display: flex;
+  min-height: 172px;
+  overflow: hidden;
+  position: relative;
+  transition:
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.home-latest-link:hover,
+.home-latest-link:focus-visible {
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--accent) 22%, transparent);
+  transform: translateY(-2px);
+}
+
+.home-latest-card.has-cover::before {
+  background: linear-gradient(180deg, rgb(31 10 22 / 16%), rgb(31 10 22 / 68%));
+  content: '';
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+}
+
+.home-latest-copy {
+  /* align-self: flex-start; */
+  display: grid;
+  gap: 6px;
+  position: relative;
+}
+
+.home-latest-card.has-cover .home-latest-copy {
+  color: #fff7fa;
+}
+
+.home-latest-card.has-cover .home-card-eyebrow {
+  color: color-mix(in srgb, var(--gold) 72%, #fff);
+}
+
+.home-latest-copy strong {
+  font-size: 20px;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+.home-latest-summary {
+  font-size: 14px;
+  line-height: 1.7;
+  opacity: 0.88;
+}
+
+/* --- 照片墙小卡 ---
+   卡片本身 overflow: hidden + 轮播用 flex 占满剩余高度（min-height: 0 允许被压缩），
+   这样图片永远被卡片裁住，不会像之前那样溢出卡片下沿。 */
+.home-photo-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.home-photo-card .home-carousel {
+  border-radius: var(--radius-sm);
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* --- 最近留言小卡 --- */
+.home-message-list {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.home-message-link {
+  display: grid;
+  gap: 2px;
+}
+
+.home-message-nick {
+  color: var(--accent-strong);
+  font-size: 13px;
+}
+
+.home-message-text {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+  transition: color 180ms ease;
+}
+
+.home-message-link:hover .home-message-text,
+.home-message-link:focus-visible .home-message-text {
+  color: var(--ink);
+}
+
+.home-empty-text {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+}
+
+/* --- 底部站点状态条 --- */
+.home-status-card {
+  align-items: center;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.home-status-identity .home-status-title {
+  font-size: 24px;
+  margin: 0;
+}
+
+.home-status-card .home-status-summary {
+  font-size: 14px;
+  line-height: 1.7;
+  margin: 6px 0 0;
+  max-width: 560px;
+}
+
+.home-status-meta {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.home-status-pill {
+  align-items: center;
+  background: color-mix(in srgb, var(--bg-soft) 70%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: 999px;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 600;
+  gap: 8px;
+  min-height: 34px;
+  padding: 4px 14px;
+}
+
+.home-status-pill.home-status-online {
+  color: var(--accent-strong);
+}
+
+.home-status-dot {
+  animation: pulse-dot 2.4s ease-in-out infinite;
+  background: #37c977;
+  border-radius: 999px;
+  box-shadow: 0 0 8px rgb(55 201 119 / 55%);
+  height: 9px;
+  width: 9px;
+}
+
+.home-status-card .home-status-error {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+/* 有音乐播放器（左下角 fixed）时给首页多留底部空间，滚到底不压住状态条。 */
+.site-shell:has(.music-player) .home-view {
+  padding-bottom: 132px;
 }
 
 .eyebrow {
@@ -727,15 +1273,12 @@ h1 {
 }
 
 .notice-strip {
-  background: var(--card);
-  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 58%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border));
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow);
   color: var(--muted);
   display: grid;
   gap: 6px;
-  margin-top: 28px;
-  max-width: 520px;
   padding: 16px;
 }
 
@@ -743,16 +1286,6 @@ h1 {
   align-items: center;
   display: flex;
   justify-content: space-between;
-}
-
-.notice-strip-header button {
-  background: transparent;
-  border: 0;
-  color: var(--muted);
-  font-size: 20px;
-  line-height: 1;
-  min-height: 28px;
-  padding: 0 4px;
 }
 
 .notice-strip span {
@@ -1122,6 +1655,11 @@ h1 {
   max-width: 920px;
 }
 
+.thoughts-page > h1,
+.essays-page > h1 {
+  margin-bottom: 50px;
+}
+
 .photos-page {
   margin: 48px 0;
 }
@@ -1202,7 +1740,7 @@ h1 {
 
 .thought-error,
 .empty-state {
-  color: var(--muted);
+  color: var(--ink);
   line-height: 1.7;
 }
 
@@ -2444,6 +2982,23 @@ h1 {
     margin: 4px 0 4px 12px;
     padding-left: 10px;
   }
+
+  .home-row-top,
+  .home-row-middle {
+    grid-template-columns: 1fr;
+  }
+
+  .home-carousel-card {
+    min-height: 260px;
+  }
+
+  .home-status-card {
+    grid-template-columns: 1fr;
+  }
+
+  .home-status-meta {
+    justify-content: flex-start;
+  }
 }
 
 @media (width <= 760px) {
@@ -2487,15 +3042,65 @@ h1 {
   }
 
   .home-view {
-    gap: 24px;
-    grid-template-columns: 1fr;
     min-height: auto;
-    padding: 32px 0;
+    padding: 24px 0 40px;
   }
 
   .home-view::before,
   .home-view::after {
     display: none;
+  }
+
+  .home-panel {
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .home-row-top,
+  .home-row-middle,
+  .home-row-mini,
+  .home-stack {
+    gap: 12px;
+  }
+
+  .home-row-mini {
+    grid-template-columns: 1fr;
+  }
+
+  .home-carousel-card {
+    min-height: 220px;
+  }
+
+  /* 窄屏单列时照片卡没有兄弟卡撑高，给轮播一个明确高度。 */
+  .home-photo-card .home-carousel {
+    min-height: 150px;
+  }
+
+  .home-clock-time {
+    font-size: 28px;
+  }
+
+  .home-clock-seconds {
+    font-size: 25px;
+  }
+
+  .home-clock-dial {
+    width: 88px;
+  }
+
+  /* 窄屏一段就可能占两行，预留高度放宽到三行；上下段都靠左更好读。 */
+  .home-quote {
+    min-height: 128px;
+  }
+
+  .home-quote-text {
+    font-size: 18px;
+    min-height: 5.25em;
+  }
+
+  .home-quote-tail {
+    justify-self: start;
+    text-align: left;
   }
 
   h1 {
@@ -2714,5 +3319,23 @@ h1 {
   .boot-rain-line {
     animation-duration: var(--dur) !important;
     animation-iteration-count: infinite !important;
+  }
+
+  /* 首页卡片的 hover 抬升是用户点名要保留的微交互：本机 Windows 关了「动画效果」，
+     真实 Chrome 里 prefers-reduced-motion 为 reduce，会被上面的全局规则压成 0.001ms，
+     表现为「一碰就跳上去」没有过渡。这里把这几处的时长恢复回来。 */
+  .home-latest-link,
+  .home-message-text,
+  .home-carousel-dot,
+  .heart-like-button {
+    transition-duration: 180ms !important;
+  }
+
+  /* 轮播换图的淡入淡出同理（否则是硬切）。 */
+  .carousel-fade-enter-active,
+  .carousel-fade-leave-active,
+  .quote-fade-enter-active,
+  .quote-fade-leave-active {
+    transition-duration: 420ms !important;
   }
 }
