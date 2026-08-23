@@ -13,11 +13,12 @@
 此前 headless Chrome 冒烟能复现动画，是因为 headless 不受该系统参数影响，
 由此造成「测试通过、用户看不到」的假象。
 
-**修复（`BootTerminal.vue`）：开发期（`playWhileDeveloping = true`）无视
-reduced-motion 必播**，保证开发者能反复查看；定稿后（`false`）恢复无障碍跳过。
+**修复（`BootTerminal.vue`）：开发构建无视 reduced-motion 必播**，保证开发者能反复查看；
+生产构建恢复无障碍跳过。当前由 `respectsReducedMotion()` 返回 `import.meta.env.PROD` 实现，
+不需要手改（历史上这里是常量 `playWhileDeveloping`，见下方「上线前收尾」）。
 配套改动：
 
-1. `BootTerminal.spec.ts`：reduced-motion 用例改为断言「开发期照播」；定稿后需恢复为「跳过并 emit done」。
+1. `BootTerminal.spec.ts`：用 `vi.stubEnv('PROD', ...)` 分别覆盖开发构建照播与生产构建跳过。
 2. `AppShell.spec.ts`：不再用 matchMedia 跳过动画，改为直接 `stubs: { BootTerminal: true }`。
 
 **验证：** Playwright 开启 `reducedMotion: 'reduce'` 模拟下，5175 上终端正常出现并播放；
@@ -31,9 +32,9 @@ reduced-motion 必播**，保证开发者能反复查看；定稿后（`false`�
 2. **浏览器缓存了旧 JS**：同一 URL 下旧 bundle 未失效。→ 强刷
    （Ctrl+Shift+R）或清缓存。
 3. **系统/浏览器开启了「减少动态效果」**：曾导致真实浏览器完全看不到动画
-   （即本次修复的根因，开发期已改为无视 reduced-motion 必播）。若**定稿后**
-   仍遇到「看不到」，检查 Windows「设置 → 辅助功能 → 视觉效果 → 动画效果」
-   与 DevTools Rendering 面板的 Emulate prefers-reduced-motion。
+   （即本次修复的根因，开发构建已改为无视 reduced-motion 必播）。若在**生产构建**下
+   遇到「看不到」，这是预期的无障碍行为；确认方式是检查 Windows「设置 → 辅助功能 →
+   视觉效果 → 动画效果」与 DevTools Rendering 面板的 Emulate prefers-reduced-motion。
 4. **访问的路径不是 `/`**：终端只挂在 `route.name === 'home'` 上。
    → 直接访问 http://localhost:5173/。
 5. **dev server 没拿到最新代码**：HMR 偶发失效。→ 重启 `pnpm --filter @yuer/web dev`。
@@ -45,7 +46,8 @@ pnpm --filter @yuer/web dev
 # 打开 http://localhost:5173/ ，应看到全屏黑底终端打字动画
 ```
 
-当前开发期行为：**每次刷新/进入首页都播**（`playWhileDeveloping = true`）。
+当前开发期行为：**每次进入首页都播**（`replayEveryVisit = false` 时同一会话只播一次，
+刷新不重播；想每次刷新都看到，把它设为 `true`）。
 
 ---
 
@@ -54,7 +56,7 @@ pnpm --filter @yuer/web dev
 | 决策项 | 结论                                                                                                                                                                                                                                                                                                                                                                                      |
 | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 形态   | 全屏黑底终端，打完整段后停在终端，出现 `$` 提示符 + 闪烁光标等待输入；进入时进度条填充（1600ms），满后**交叉转场**进入首页：终端淡出 + 微放大（600ms），同时首页内容从下方 16px 处上浮浮现（600ms）                                                                                                                                                                                       |
-| 频率   | **开发阶段：每次进首页都播**（`BootTerminal.vue` 顶部 `playWhileDeveloping = true`），方便反复查看效果；**定稿后改为 false**，恢复「同一浏览器会话只播一次」                                                                                                                                                                                                                              |
+| 频率   | 由 `BootTerminal.vue` 顶部 `replayEveryVisit` 控制：`false`（当前）= 同一浏览器会话只播一次，之后刷新直接进首页；`true` = 每次进首页都重播（调试开屏动画本身时用）                                                                                                                                                                                                                        |
 | 内容   | 伪命令行一问一答：`whoami` → `cat welcome.txt` → `ls`，最后一行落到站点标语                                                                                                                                                                                                                                                                                                               |
 | 配色   | 黑底 `#070d08` + 绿字 `#2ee46f`，提示符 `$` 与光标块用站点粉 `var(--accent)` 点缀                                                                                                                                                                                                                                                                                                         |
 | 进入   | **点击屏幕任意处直接进入**；或输入 `clear`/无效命令回显 `command not found` 后回车，仅 `clear` 触发进度条。提示小字「点击屏幕进入 · 或输入 clear」                                                                                                                                                                                                                                        |
@@ -65,7 +67,7 @@ pnpm --filter @yuer/web dev
 
 | 文件                                       | 职责                                                                                                                 |
 | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
-| `apps/web/src/components/BootTerminal.vue` | 打字动画状态机、快进/进度条/`leave`+`done` 事件、`playWhileDeveloping` 开发开关                                      |
+| `apps/web/src/components/BootTerminal.vue` | 打字动画状态机、快进/进度条/`leave`+`done` 事件、`replayEveryVisit` 与 `respectsReducedMotion()`                     |
 | `apps/web/src/App.vue`                     | `bootOpen` 控制挂载：进首页 true、播完/离开 false；`bootReveal` 在 `@leave` 时置 true 触发首页上浮转场；`@done` 卸载 |
 | `apps/web/src/styles.css`                  | `.boot-terminal` 全屏遮罩（z-index 1000）、绿黑配色、光标闪烁 keyframes、`.boot-reveal` 交叉转场 keyframes           |
 | `apps/web/src/composables/useI18n.ts`      | `terminal.whoami` / `terminal.ls` / `terminal.skip` / `terminal.enterHint` / `terminal.commandNotFound` 三种语言文案 |
@@ -107,12 +109,12 @@ watch(
 
 1. **首屏无闪白**：`bootOpen` 初始 `false`，`immediate` watcher 在 setup 阶段
    置 `true`，首个渲染帧就包含终端遮罩。
-2. **会话记忆（仅定稿后）**：`playWhileDeveloping = false` 时，只有真正
+2. **会话记忆**：`replayEveryVisit = false`（当前）时，只有真正
    **进入页面**（点击屏幕或 `clear` 后回车 → 进度条 → `startExit()`）才会写
    sessionStorage（key `yuer.boot.played`）；快进文字不写记忆。写入后关掉
-   浏览器标签再回来会重播。**开发阶段（当前）不写记忆，每次进首页都播**。
-3. **中途离开首页**：动画未完成时导航走，组件卸载并停掉所有定时器；开发阶段
-   不写记忆，回到首页会重新播放（仍可快进文字）。
+   浏览器标签再回来会重播。设为 `true` 则不写记忆，每次进首页都播。
+3. **中途离开首页**：动画未完成时导航走，组件卸载并停掉所有定时器；因为没走到
+   `startExit()`，记忆未写入，回到首页会重新播放（仍可快进文字）。
 4. **节奏**：命令行 12→7 fps 逐字打字（用户反馈 20 fps 偏快后放慢），行间停顿
    300/200ms（`2*LS_ITEM_STEP+STALL_MS` / `STALL_MS`），全部打完约 8 秒；总时长由
    `BootTerminal.vue` 顶部常量控制（`INITIAL_FPS` / `MIN_FPS` / `STALL_MS` / `LS_ITEM_STEP`）。
@@ -159,10 +161,10 @@ prod 无 reduce 照播三个分支，不存在需要「上线时同步改断言�
 
 1. 进入首页：黑底终端出现，`$ whoami` 逐字打出后回车回显名字，依次打完三段。
 2. 打完文字后出现 `$ ▊` 等待提示符；点击屏幕任意处或输入 `clear` 回车 → 进度条填充 → 淡出露出粉色首页，DOM 中无 `.boot-terminal` 残留。
-3. **开发阶段（当前）刷新 / 反复进首页：每次都重新播放**（这是为了便于调整）。
-4. 打字中按 Esc / Enter：快进文字到等待提示符，**不会**直接进入页面；开发阶段不写记忆，下次进首页仍会播。
+3. **同一会话内刷新 / 反复进首页：只播一次**（`replayEveryVisit = false`）。想每次都播，把它设为 `true`。
+4. 打字中按 Esc / Enter：快进文字到等待提示符，**不会**直接进入页面；不写记忆，下次进首页仍会播。
 5. 深色 / 浅色主题、中英日三种语言文案都正常。
-6. `prefers-reduced-motion: reduce` 时直接跳过（定稿后）。
+6. `prefers-reduced-motion: reduce` 时直接跳过——**仅生产构建**（`import.meta.env.PROD`）；开发构建照常播放。
 
 验证命令：
 
