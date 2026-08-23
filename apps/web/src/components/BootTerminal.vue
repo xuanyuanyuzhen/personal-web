@@ -14,7 +14,7 @@ import { useI18n } from '../composables/useI18n';
  *   可真实敲入命令（如 clear），回车或点击屏幕进入；
  *   进入时进度条填充，满则整体淡出露出首页。
  *
- * 播放时机由下面两个开关控制，见 `replayEveryVisit` / `respectReducedMotion`。
+ * 播放时机由下面两处控制，见 `replayEveryVisit` / `respectsReducedMotion()`。
  */
 
 const SESSION_KEY = 'yuer.boot.played';
@@ -30,15 +30,25 @@ const replayEveryVisit = false;
 
 /**
  * 是否尊重系统的「减少动态效果」（prefers-reduced-motion: reduce）。
- * - `false`（当前）：无视该设置照常播放；
- * - `true`：开了减少动态效果就整段跳过（不挂载、不播）。**上线前必须改回 true。**
+ * - 生产构建（`import.meta.env.PROD`）：`true` —— 开了减少动态效果就整段跳过
+ *   （不挂载、不播），这是无障碍要求，上线必须如此。
+ * - 开发构建：`false` —— 无视该设置照常播放，否则本机根本看不到开屏。
  *
- * ⚠️ 这两个开关以前是合成一个的（`playWhileDeveloping`），结果「改成只播一次」
- * 会连带把无障碍跳过一起打开。本机 Windows 关了「动画效果」，真实 Chrome 里
- * prefers-reduced-motion 就是 reduce —— 合成一个开关时一翻就变成「一次都不播」，
- * 而不是「只播一次」。所以刻意拆成两个，别再合回去。
+ * ⚠️ 为什么跟着构建模式走，而不是留一个手改的常量：本机 Windows 关了「动画效果」，
+ * 真实 Chrome 里 prefers-reduced-motion 就是 reduce。如果靠「上线前记得改成 true」，
+ * 要么忘了改（线上不合规），要么改了之后本地再也看不到开屏（没法调试）。
+ * 绑到 PROD 上两边都对，且不依赖人的记性。
+ *
+ * ⚠️ 这个开关和 `replayEveryVisit` 必须保持分开。以前是合成一个的
+ * （`playWhileDeveloping`），结果「改成只播一次」会连带把无障碍跳过一起打开，
+ * 于是本机一次都不播。别再合回去。
+ *
+ * 注：写成函数而不是模块常量，是为了让测试能分别覆盖两个分支
+ * （模块常量在 import 时就定型，stub 不掉）。
  */
-const respectReducedMotion = false;
+function respectsReducedMotion(): boolean {
+  return import.meta.env.PROD;
+}
 
 // 打字节奏：20→10 fps 偏快（用户反馈），放慢为 12→7 fps，行间停顿也加长一点。
 const INITIAL_FPS = 12;
@@ -116,9 +126,9 @@ onMounted(() => {
     typeof window.matchMedia === 'function' &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // 无障碍：开了「减少动态效果」就整段跳过（当前 respectReducedMotion=false，
-  // 即照常播放；上线前把它改成 true）。
-  if (respectReducedMotion && prefersReducedMotion) {
+  // 无障碍：开了「减少动态效果」就整段跳过。生产构建下生效，开发构建下照常播放，
+  // 见 respectsReducedMotion() 上方的说明。
+  if (respectsReducedMotion() && prefersReducedMotion) {
     isVisible.value = false;
     emit('done');
     return;

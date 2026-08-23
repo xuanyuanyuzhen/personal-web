@@ -162,8 +162,17 @@ statusLabel / statusOnline / statusDays`（zh/en/ja 三份）。版块计数标�
 - `replayEveryVisit`（当前 `false`）：`false` = 同一浏览器会话只播一次，之后刷新直接进首页
   （调试首页内容时用）；`true` = 每次进首页都重播（调试开屏动画本身时用）。
   想再看一次：关掉标签页重开，或删掉 sessionStorage 的 `yuer.boot.played`。
-- `respectReducedMotion`（当前 `false`）：`true` = 系统开了「减少动态效果」就整段跳过。
-  **上线前必须改成 true**（届时 `BootTerminal.spec.ts` 第一条断言要同步改为「不挂载 + emit done」）。
+- `respectsReducedMotion()`：返回 `import.meta.env.PROD`，**不需要手改**。生产构建下
+  系统开了「减少动态效果」就整段跳过（无障碍要求）；开发构建下无视该设置照常播放。
+
+  之前这里是个常量 `respectReducedMotion = false` 加一条「上线前必须改成 true」的注释，
+  已改成跟随构建模式。原因：本机 `prefers-reduced-motion` 恒为 `reduce`，手改成 `true`
+  就等于本地再也看不到开屏，于是这个待办永远处在「改了没法调试 / 不改线上不合规」的两难里。
+  绑到 `PROD` 上两边都对，也不依赖谁的记性。
+
+  `BootTerminal.spec.ts` 用 `vi.stubEnv('PROD', ...)` 覆盖了三个分支：dev 照播、
+  prod + reduce 跳过、prod + 无 reduce 照播。（`PROD` 在 vitest 的 `_envBooleans`
+  白名单里，`stubEnv('PROD', false)` 得到空字符串而非 truthy 的 `'false'`。）
 
 ⚠️ 这两件事以前是同一个开关 `playWhileDeveloping` 控制的。本机 `prefers-reduced-motion` 为
 `reduce`，一旦把它翻成 `false` 想要「只播一次」，会连带打开无障碍跳过，结果变成**一次都不播**。

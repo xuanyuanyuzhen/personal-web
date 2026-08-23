@@ -5,6 +5,18 @@ import { setLocale } from '../composables/useI18n';
 
 const SESSION_KEY = 'yuer.boot.played';
 
+/** 伪造 prefers-reduced-motion 的匹配结果。jsdom 不实现 matchMedia。 */
+function stubReducedMotion(matches: boolean) {
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn().mockReturnValue({
+      matches,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }),
+  );
+}
+
 describe('BootTerminal', () => {
   beforeEach(() => {
     window.localStorage.clear();
@@ -14,21 +26,39 @@ describe('BootTerminal', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
   });
 
-  it('plays anyway under prefers-reduced-motion (respectReducedMotion=false)', async () => {
-    // 无障碍开关当前关着：无视 reduced-motion 照常播放。
-    // ⚠️ 本机 Windows 关了「动画效果」，真实 Chrome 里 prefers-reduced-motion 就是 reduce，
-    // 如果把它和「只播一次」合成一个开关，一翻就变成「一次都不播」。
-    // 上线前把 respectReducedMotion 改成 true，届时这条断言要改为「不挂载 + emit done」。
-    vi.stubGlobal(
-      'matchMedia',
-      vi.fn().mockReturnValue({
-        matches: true,
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-      }),
-    );
+  it('plays anyway under prefers-reduced-motion in a dev build', async () => {
+    // 开发构建下无视 reduced-motion 照常播放，否则本机根本看不到开屏
+    // （本机 Windows 关了「动画效果」，真实 Chrome 里 prefers-reduced-motion 就是 reduce）。
+    stubReducedMotion(true);
+    vi.stubEnv('PROD', false);
+
+    const wrapper = mount(BootTerminal);
+
+    await nextTick();
+
+    expect(wrapper.find('.boot-terminal').exists()).toBe(true);
+  });
+
+  it('skips the whole terminal under prefers-reduced-motion in a prod build', async () => {
+    // 上线后的无障碍行为：开了「减少动态效果」就不挂载、不播，直接放行到首页。
+    stubReducedMotion(true);
+    vi.stubEnv('PROD', true);
+
+    const wrapper = mount(BootTerminal);
+
+    await nextTick();
+
+    expect(wrapper.find('.boot-terminal').exists()).toBe(false);
+    expect(wrapper.emitted('done')).toHaveLength(1);
+  });
+
+  it('still plays in a prod build when reduced motion is off', async () => {
+    // 绝大多数访客走这条路径：生产环境照常有开屏动画。
+    stubReducedMotion(false);
+    vi.stubEnv('PROD', true);
 
     const wrapper = mount(BootTerminal);
 
