@@ -15,9 +15,13 @@ const mode = ref('list');
 const currentTime = ref(0);
 const lyricLines = ref([]);
 const lyricTextFallback = ref('');
+const playbackError = ref('');
+let lyricRequestSequence = 0;
 
 const currentTrack = computed(() => tracks.value[currentIndex.value] ?? null);
-const currentSrc = computed(() => currentTrack.value?.localUrl || currentTrack.value?.externalUrl || '');
+const currentSrc = computed(
+  () => currentTrack.value?.localUrl || currentTrack.value?.externalUrl || '',
+);
 const hasTracks = computed(() => tracks.value.length > 0);
 const currentLyric = computed(() => {
   if (lyricLines.value.length === 0) {
@@ -50,7 +54,9 @@ watch(currentTrack, () => {
 async function loadMusic() {
   try {
     const result = await publicApi.getMusic();
-    tracks.value = Array.isArray(result) ? result.filter((item) => item && (item.localUrl || item.externalUrl)) : [];
+    tracks.value = Array.isArray(result)
+      ? result.filter((item) => item && (item.localUrl || item.externalUrl))
+      : [];
     clampCurrentIndex();
     await nextTick();
     audioRef.value?.load();
@@ -87,6 +93,9 @@ function persistState() {
 }
 
 function clampCurrentIndex() {
+  // 后台删歌后，用户 localStorage 里存的旧索引可能超出当前列表长度。
+  // 不修正的话 currentTrack 会是 undefined，模板里 currentTrack?.title 显示空白，
+  // 播放器看起来「坏了」但不报错。
   if (currentIndex.value >= tracks.value.length) {
     currentIndex.value = 0;
   }
@@ -104,10 +113,14 @@ async function togglePlay() {
   }
 
   try {
+    playbackError.value = '';
     await audioRef.value.play();
     isPlaying.value = true;
   } catch {
+    // 播放失败最常见的原因是浏览器自动播放策略拦截，其次是音频地址失效。
+    // 原来这里静默吞掉异常，用户只看到「点了没反应」，无从判断。
     isPlaying.value = false;
+    playbackError.value = t('music.playFailed');
   }
 }
 
@@ -126,16 +139,25 @@ function nextTrack() {
   }
 
   if (mode.value === 'random' && tracks.value.length > 1) {
-    let nextIndex = currentIndex.value;
-    while (nextIndex === currentIndex.value) {
-      nextIndex = Math.floor(Math.random() * tracks.value.length);
-    }
-    currentIndex.value = nextIndex;
+    currentIndex.value = pickRandomOtherIndex(currentIndex.value, tracks.value.length);
   } else {
     currentIndex.value = (currentIndex.value + 1) % tracks.value.length;
   }
 
   void syncAudioAfterTrackChange();
+}
+
+/**
+ * 从「除 current 之外」的下标里等概率取一个。
+ *
+ * 原来是 `while (next === current) next = random()` —— 无界循环，虽然
+ * length > 1 时期望只转两次，但没有上界。这里先在 length-1 个候选里取，
+ * 再把落在 current 及其之后的下标后移一位，一次就得到结果。
+ */
+function pickRandomOtherIndex(current, length) {
+  const picked = Math.floor(Math.random() * (length - 1));
+
+  return picked >= current ? picked + 1 : picked;
 }
 
 async function syncAudioAfterTrackChange() {
@@ -172,6 +194,10 @@ function handleTimeUpdate() {
 }
 
 async function loadLyrics() {
+  // 快速切歌时，先发出的歌词请求可能后返回，把当前曲目的歌词覆盖成上一首的。
+  // 用递增序号标记本次请求，返回时对不上就丢弃（与 MessagesView 里同一套做法）。
+  const requestId = ++lyricRequestSequence;
+
   lyricLines.value = [];
   lyricTextFallback.value = '';
   currentTime.value = 0;
@@ -188,6 +214,10 @@ async function loadLyrics() {
     } catch {
       text = '';
     }
+  }
+
+  if (requestId !== lyricRequestSequence) {
+    return;
   }
 
   const parsed = parseLyrics(text);
@@ -239,6 +269,13 @@ function parseLyrics(text) {
     />
 
     <div class="music-player-main">
+      <p
+        v-if="playbackError"
+        class="music-error"
+        role="alert"
+      >
+        {{ playbackError }}
+      </p>
       <button
         class="music-icon-button"
         type="button"
@@ -279,7 +316,13 @@ function parseLyrics(text) {
         :aria-label="t('music.mode')"
         @click="cycleMode"
       >
-        {{ mode === 'single' ? t('music.single') : mode === 'random' ? t('music.random') : t('music.list') }}
+        {{
+          mode === 'single'
+            ? t('music.single')
+            : mode === 'random'
+              ? t('music.random')
+              : t('music.list')
+        }}
       </button>
     </div>
 
@@ -297,7 +340,10 @@ function parseLyrics(text) {
           class="music-playlist-item"
           type="button"
           :class="{ active: index === currentIndex }"
-          @click="currentIndex = index; syncAudioAfterTrackChange()"
+          @click="
+            currentIndex = index;
+            syncAudioAfterTrackChange();
+          "
         >
           <span>{{ track.title }}</span>
           <small>{{ track.artist }}</small>
