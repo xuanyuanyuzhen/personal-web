@@ -7,6 +7,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { AUTH_COOKIE_NAME } from './auth/auth.constants';
+import { shouldBlockFromPublicNetwork } from './common/local-only';
 import { corsAllowedOrigins, isProduction, validateEnvironment } from './config/env';
 import { uploadRoot } from './uploads/upload.service';
 
@@ -21,6 +22,22 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
   app.useStaticAssets(uploadRoot(), {
     prefix: `${uploadPrefix}/`,
+  });
+
+  // 管理端与登录端点只允许本机直连，公网来源直接 404。
+  //
+  // 必须注册在 Nest 路由之前 —— 这里正好满足：Nest 的路由是在 app.listen()
+  // 内部注册的，此处 app.use() 一定排在它前面。
+  //
+  // 回 404 而不是 403：403 等于告诉扫描者「这个端点存在，只是你没权限」，
+  // 404 什么都不透露，和生产环境关掉 Swagger 是同一个思路。
+  app.use((request: Request, response: Response, next: NextFunction) => {
+    if (shouldBlockFromPublicNetwork(request)) {
+      response.status(404).json({ message: 'Not Found', statusCode: 404 });
+      return;
+    }
+
+    next();
   });
 
   // 只允许白名单来源携带凭证。原来的 `origin: true` 会回显任意 Origin，

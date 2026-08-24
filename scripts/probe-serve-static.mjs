@@ -13,7 +13,14 @@
 
 const BASE = process.env.PROBE_BASE_URL?.trim() || 'http://127.0.0.1:3000';
 
-/** [路径, Accept, 方法, 期望状态, 期望是否为 HTML, 说明] */
+/**
+ * 模拟「经 Cloudflare 转发」的请求头。Cloudflare 对每个转发请求都注入
+ * CF-Connecting-IP，代码里的 shouldBlockFromPublicNetwork 就是靠它区分
+ * 公网来源和本机直连。
+ */
+const CF = { 'CF-Connecting-IP': '203.0.113.5' };
+
+/** [路径, Accept, 方法, 期望状态, 期望是否为 HTML, 说明, 额外请求头] */
 const CASES = [
   ['/api/health', 'text/html', 'GET', 200, false, 'API 健康检查'],
   ['/', 'text/html', 'GET', 200, true, '首页返回 index.html'],
@@ -26,6 +33,26 @@ const CASES = [
   ['/assets/nope.css', 'text/css', 'GET', 404, false, '缺失样式照常 404'],
   ['/bg/home.jpg', '*/*', 'GET', 200, false, '真实存在的静态资源'],
   ['/uploads/nope.png', '*/*', 'GET', 404, false, '缺失上传文件照常 404'],
+
+  // ——— 本机直连：后台面板必须能用（无 CF-Connecting-IP）———
+  // 401 = 中间件放行、走到了 AdminAuthGuard（没带 cookie 所以拒绝）。
+  // 若这里变成 404，说明加固把本机也拦了，后台会彻底进不去。
+  ['/api/auth/me', '*/*', 'GET', 401, false, '本机: 登录态检查可达'],
+  ['/api/admin/essays', '*/*', 'GET', 401, false, '本机: 管理端可达'],
+
+  // ——— 模拟公网来源：带 CF-Connecting-IP，管理端与登录应全部 404 ———
+  ['/api/auth/login', '*/*', 'POST', 404, false, '公网: 登录被拦', CF],
+  ['/api/auth/me', '*/*', 'GET', 404, false, '公网: 登录态检查被拦', CF],
+  ['/api/auth/change-password', '*/*', 'POST', 404, false, '公网: 改密码被拦', CF],
+  ['/api/admin/essays', '*/*', 'GET', 404, false, '公网: 管理端被拦', CF],
+  ['/api/admin/settings', '*/*', 'PUT', 404, false, '公网: 站点设置被拦', CF],
+
+  // ——— 公网来源：前台要用的端点必须照常可用 ———
+  ['/', 'text/html', 'GET', 200, true, '公网: 首页正常', CF],
+  ['/api/health', '*/*', 'GET', 200, false, '公网: 健康检查正常', CF],
+  ['/api/essays/public', '*/*', 'GET', 200, false, '公网: 随笔列表正常', CF],
+  ['/api/thoughts/public', '*/*', 'GET', 200, false, '公网: 碎碎念列表正常', CF],
+  ['/api/site/settings', '*/*', 'GET', 200, false, '公网: 站点设置读取正常', CF],
 ];
 
 function looksLikeHtml(body) {
@@ -36,13 +63,16 @@ function looksLikeHtml(body) {
 
 const results = [];
 
-for (const [path, accept, method, wantStatus, wantHtml, label] of CASES) {
+for (const [path, accept, method, wantStatus, wantHtml, label, extraHeaders] of CASES) {
   let status = 'ERR';
   let isHtml = false;
   let detail = '';
 
   try {
-    const response = await fetch(BASE + path, { method, headers: { Accept: accept } });
+    const response = await fetch(BASE + path, {
+      method,
+      headers: { Accept: accept, ...extraHeaders },
+    });
     const body = await response.text();
     status = response.status;
     isHtml = looksLikeHtml(body);
