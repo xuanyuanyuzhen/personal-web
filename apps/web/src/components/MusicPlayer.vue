@@ -4,52 +4,154 @@ import { useI18n } from '../composables/useI18n';
 import { publicApi } from '../services/api';
 
 const STORAGE_KEY = 'yuer.musicPlayer';
+const DEFAULT_VOLUME = 0.7;
 
 const { t } = useI18n();
 const audioRef = ref(null);
+const lyricsRef = ref(null);
 const tracks = ref([]);
 const currentIndex = ref(0);
 const isPlaying = ref(false);
 const expanded = ref(false);
 const mode = ref('list');
 const currentTime = ref(0);
+const duration = ref(0);
+const volume = ref(DEFAULT_VOLUME);
+const isMuted = ref(false);
 const lyricLines = ref([]);
 const lyricTextFallback = ref('');
 const playbackError = ref('');
 let lyricRequestSequence = 0;
+
+// 拖动进度条期间，timeupdate 仍在推进 currentTime，会把滑块拽回播放位置。
+// 所以拖动时改用 seekTime 显示，松手（change 事件）才提交给 audio。
+const isSeeking = ref(false);
+const seekTime = ref(0);
 
 const currentTrack = computed(() => tracks.value[currentIndex.value] ?? null);
 const currentSrc = computed(
   () => currentTrack.value?.localUrl || currentTrack.value?.externalUrl || '',
 );
 const hasTracks = computed(() => tracks.value.length > 0);
-const currentLyric = computed(() => {
+const hasTimedLyrics = computed(() => lyricLines.value.length > 0);
+
+/** 进度条显示值：拖动中用手指的位置，否则跟着播放进度。 */
+const sliderTime = computed(() => (isSeeking.value ? seekTime.value : currentTime.value));
+
+/**
+ * 可跳转的总时长。直播流的 duration 是 Infinity，未加载完是 NaN，
+ * 两种都不能拿去当滑块上限，否则滑块会失效或算出 NaN 百分比。
+ */
+const seekableDuration = computed(() =>
+  Number.isFinite(duration.value) && duration.value > 0 ? duration.value : 0,
+);
+
+/** 当前该高亮的歌词行下标；没有时间轴歌词时为 -1。 */
+const activeLyricIndex = computed(() => {
   if (lyricLines.value.length === 0) {
-    return lyricTextFallback.value;
+    return -1;
   }
 
-  let line = lyricLines.value[0];
-  for (const item of lyricLines.value) {
-    if (item.time <= currentTime.value) {
-      line = item;
+  let index = 0;
+  for (let i = 0; i < lyricLines.value.length; i += 1) {
+    if (lyricLines.value[i].time <= currentTime.value) {
+      index = i;
     } else {
       break;
     }
   }
 
-  return line?.text ?? '';
+  return index;
 });
+
+const progressPercent = computed(() =>
+  seekableDuration.value === 0 ? 0 : (sliderTime.value / seekableDuration.value) * 100,
+);
 
 onMounted(async () => {
   restoreState();
   await loadMusic();
+  applyVolumeToAudio();
 });
 
-watch([currentIndex, mode, expanded], persistState);
+watch([currentIndex, mode, expanded, volume, isMuted], persistState);
 
 watch(currentTrack, () => {
   void loadLyrics();
 });
+
+watch([volume, isMuted], applyVolumeToAudio);
+
+// 歌词换行时把当前行滚到可视区中间。scroll-behavior: smooth 写在 CSS 里，
+// reduced-motion 下会被全局规则降级成瞬间跳转 —— 这是无障碍上正确的行为，不覆盖。
+watch(activeLyricIndex, (index) => {
+  const container = lyricsRef.value;
+  if (!container || index < 0) {
+    return;
+  }
+
+  const line = container.children[index];
+  if (!line) {
+    return;
+  }
+
+  container.scrollTop = line.offsetTop - container.clientHeight / 2 + line.clientHeight / 2;
+});
+
+function applyVolumeToAudio() {
+  if (!audioRef.value) {
+    return;
+  }
+
+  audioRef.value.volume = volume.value;
+  audioRef.value.muted = isMuted.value;
+}
+
+/** 秒数转 m:ss。时长未知时给出 --:--，避免显示 NaN。 */
+function formatTime(seconds) {
+  if (!Number.isFinite(seconds) || seconds < 0) {
+    return '--:--';
+  }
+
+  const whole = Math.floor(seconds);
+  const minutes = Math.floor(whole / 60);
+
+  return `${minutes}:${String(whole % 60).padStart(2, '0')}`;
+}
+
+function handleLoadedMetadata() {
+  duration.value = audioRef.value?.duration ?? 0;
+  applyVolumeToAudio();
+}
+
+function handleSeekInput(event) {
+  isSeeking.value = true;
+  seekTime.value = Number(event.target.value);
+}
+
+function handleSeekCommit(event) {
+  const value = Number(event.target.value);
+
+  if (audioRef.value && seekableDuration.value > 0) {
+    audioRef.value.currentTime = value;
+  }
+
+  currentTime.value = value;
+  isSeeking.value = false;
+}
+
+function handleVolumeInput(event) {
+  volume.value = Number(event.target.value);
+
+  // 拖动音量条即视为取消静音，否则用户拉了音量却没声音，看起来像坏了。
+  if (volume.value > 0) {
+    isMuted.value = false;
+  }
+}
+
+function toggleMute() {
+  isMuted.value = !isMuted.value;
+}
 
 async function loadMusic() {
   try {
@@ -75,6 +177,12 @@ function restoreState() {
     if (['list', 'single', 'random'].includes(state.mode)) {
       mode.value = state.mode;
     }
+    // 音量存的是 0~1 的小数，超范围或非数字都退回默认值，
+    // 否则一个坏值会让 audio.volume 抛 IndexSizeError、整个播放器不可用。
+    if (Number.isFinite(state.volume) && state.volume >= 0 && state.volume <= 1) {
+      volume.value = state.volume;
+    }
+    isMuted.value = Boolean(state.isMuted);
     expanded.value = Boolean(state.expanded);
   } catch {
     currentIndex.value = 0;
@@ -87,7 +195,9 @@ function persistState() {
     JSON.stringify({
       currentIndex: currentIndex.value,
       expanded: expanded.value,
+      isMuted: isMuted.value,
       mode: mode.value,
+      volume: volume.value,
     }),
   );
 }
@@ -163,8 +273,14 @@ function pickRandomOtherIndex(current, length) {
 async function syncAudioAfterTrackChange() {
   const shouldResume = isPlaying.value;
   isPlaying.value = false;
+  // 不重置的话，新歌加载出 loadedmetadata 之前，进度条会短暂停在上一首的
+  // 时长和位置上。
+  currentTime.value = 0;
+  duration.value = 0;
+  isSeeking.value = false;
   await nextTick();
   audioRef.value?.load();
+  applyVolumeToAudio();
 
   if (shouldResume) {
     await togglePlay();
@@ -263,6 +379,7 @@ function parseLyrics(text) {
       :src="currentSrc"
       preload="metadata"
       @ended="handleEnded"
+      @loadedmetadata="handleLoadedMetadata"
       @pause="isPlaying = false"
       @play="isPlaying = true"
       @timeupdate="handleTimeUpdate"
@@ -276,63 +393,202 @@ function parseLyrics(text) {
       >
         {{ playbackError }}
       </p>
-      <button
-        class="music-icon-button"
-        type="button"
-        :aria-label="isPlaying ? t('music.pause') : t('music.play')"
-        @click="togglePlay"
-      >
-        {{ isPlaying ? 'Pause' : 'Play' }}
-      </button>
 
-      <button
-        class="music-track"
-        type="button"
-        @click="expanded = !expanded"
-      >
-        <strong>{{ currentTrack?.title }}</strong>
-        <span>{{ currentTrack?.artist }}</span>
-      </button>
+      <div class="music-controls">
+        <button
+          class="music-play-button"
+          type="button"
+          :aria-label="isPlaying ? t('music.pause') : t('music.play')"
+          @click="togglePlay"
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+          >
+            <g v-if="isPlaying">
+              <rect
+                x="7"
+                y="5"
+                width="3.4"
+                height="14"
+                rx="1.2"
+              />
+              <rect
+                x="13.6"
+                y="5"
+                width="3.4"
+                height="14"
+                rx="1.2"
+              />
+            </g>
+            <path
+              v-else
+              d="M8.5 5.6a1 1 0 0 1 1.53-.85l8 5.4a1 1 0 0 1 0 1.7l-8 5.4a1 1 0 0 1-1.53-.85Z"
+            />
+          </svg>
+        </button>
 
-      <button
-        class="music-icon-button"
-        type="button"
-        :aria-label="t('music.previous')"
-        @click="previousTrack"
-      >
-        Prev
-      </button>
-      <button
-        class="music-icon-button"
-        type="button"
-        :aria-label="t('music.next')"
-        @click="nextTrack"
-      >
-        Next
-      </button>
-      <button
-        class="music-mode-button"
-        type="button"
-        :aria-label="t('music.mode')"
-        @click="cycleMode"
-      >
-        {{
-          mode === 'single'
-            ? t('music.single')
-            : mode === 'random'
-              ? t('music.random')
-              : t('music.list')
-        }}
-      </button>
+        <button
+          class="music-track"
+          type="button"
+          :aria-expanded="expanded"
+          @click="expanded = !expanded"
+        >
+          <strong>{{ currentTrack?.title }}</strong>
+          <span>{{ currentTrack?.artist }}</span>
+        </button>
+
+        <button
+          class="music-icon-button"
+          type="button"
+          :aria-label="t('music.previous')"
+          @click="previousTrack"
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+          >
+            <path
+              d="M15.5 6.4a1 1 0 0 0-1.53-.85l-6.2 4.6a1 1 0 0 0 0 1.7l6.2 4.6a1 1 0 0 0 1.53-.85Z"
+            />
+            <rect
+              x="6"
+              y="5.5"
+              width="2"
+              height="13"
+              rx="1"
+            />
+          </svg>
+        </button>
+
+        <button
+          class="music-icon-button"
+          type="button"
+          :aria-label="t('music.next')"
+          @click="nextTrack"
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+          >
+            <path
+              d="M8.5 6.4a1 1 0 0 1 1.53-.85l6.2 4.6a1 1 0 0 1 0 1.7l-6.2 4.6a1 1 0 0 1-1.53-.85Z"
+            />
+            <rect
+              x="16"
+              y="5.5"
+              width="2"
+              height="13"
+              rx="1"
+            />
+          </svg>
+        </button>
+
+        <button
+          class="music-mode-button"
+          type="button"
+          :aria-label="t('music.mode')"
+          @click="cycleMode"
+        >
+          {{
+            mode === 'single'
+              ? t('music.single')
+              : mode === 'random'
+                ? t('music.random')
+                : t('music.list')
+          }}
+        </button>
+      </div>
+
+      <div class="music-progress-row">
+        <span class="music-time">{{ formatTime(sliderTime) }}</span>
+        <input
+          class="music-range music-progress"
+          type="range"
+          min="0"
+          :max="seekableDuration || 1"
+          step="0.1"
+          :value="sliderTime"
+          :disabled="seekableDuration === 0"
+          :style="{ '--fill': progressPercent + '%' }"
+          :aria-label="t('music.progress')"
+          :aria-valuetext="formatTime(sliderTime)"
+          @input="handleSeekInput"
+          @change="handleSeekCommit"
+        >
+        <span class="music-time">{{ formatTime(duration) }}</span>
+      </div>
     </div>
 
     <div
       v-if="expanded"
       class="music-player-panel"
     >
-      <p class="music-lyric">
-        {{ currentLyric }}
+      <div class="music-volume-row">
+        <button
+          class="music-icon-button"
+          type="button"
+          :aria-label="isMuted ? t('music.unmute') : t('music.mute')"
+          @click="toggleMute"
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+          >
+            <path d="M4 9.5h3L11.5 6v12L7 14.5H4Z" />
+            <path
+              v-if="isMuted"
+              d="M15 9.5l4.5 5m0-5-4.5 5"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+            />
+            <path
+              v-else
+              d="M14.8 8.6a4.4 4.4 0 0 1 0 6.8M17 6.4a7.6 7.6 0 0 1 0 11.2"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+            />
+          </svg>
+        </button>
+        <input
+          class="music-range music-volume"
+          type="range"
+          min="0"
+          max="1"
+          step="0.01"
+          :value="volume"
+          :style="{ '--fill': (isMuted ? 0 : volume * 100) + '%' }"
+          :aria-label="t('music.volume')"
+          :aria-valuetext="Math.round(volume * 100) + '%'"
+          @input="handleVolumeInput"
+        >
+      </div>
+
+      <div
+        v-if="hasTimedLyrics"
+        ref="lyricsRef"
+        class="music-lyrics"
+      >
+        <p
+          v-for="(line, index) in lyricLines"
+          :key="line.time"
+          class="music-lyric-line"
+          :class="{ active: index === activeLyricIndex }"
+        >
+          {{ line.text || '♪' }}
+        </p>
+      </div>
+      <p
+        v-else
+        class="music-lyric"
+      >
+        {{ lyricTextFallback }}
       </p>
+
       <div class="music-playlist">
         <button
           v-for="(track, index) in tracks"

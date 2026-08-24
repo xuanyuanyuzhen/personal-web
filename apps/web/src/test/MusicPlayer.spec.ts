@@ -77,7 +77,7 @@ describe('MusicPlayer', () => {
     expect(playMock).not.toHaveBeenCalled();
     expect(loadMock).toHaveBeenCalled();
 
-    await wrapper.get('.music-icon-button').trigger('click');
+    await wrapper.get('.music-play-button').trigger('click');
     await flushPromises();
 
     expect(playMock).toHaveBeenCalledTimes(1);
@@ -151,7 +151,7 @@ describe('MusicPlayer', () => {
     const wrapper = mount(MusicPlayer);
     await flushPromises();
 
-    await wrapper.get('.music-icon-button').trigger('click');
+    await wrapper.get('.music-play-button').trigger('click');
     await flushPromises();
 
     expect(wrapper.get('.music-error').text()).toContain('播放失败');
@@ -211,8 +211,9 @@ describe('MusicPlayer', () => {
     const wrapper = mount(MusicPlayer);
     await flushPromises();
 
-    // .music-icon-button 依次是 播放 / 上一首 / 下一首。
-    const nextButton = () => wrapper.findAll('.music-icon-button')[2];
+    // 收起状态下 .music-icon-button 依次是 上一首 / 下一首（播放键是
+    // .music-play-button，静音键在展开面板里）。用 aria-label 定位更抗重构。
+    const nextButton = () => wrapper.get('[aria-label="下一首"]');
 
     for (const sample of [0, 0.49, 0.99]) {
       vi.spyOn(Math, 'random').mockReturnValue(sample);
@@ -227,5 +228,97 @@ describe('MusicPlayer', () => {
       await flushPromises();
       expect(wrapper.text()).toContain('春日散步');
     }
+  });
+
+  it('commits a seek only on release, so dragging is not fought by timeupdate', async () => {
+    const wrapper = mount(MusicPlayer);
+    await flushPromises();
+
+    const audio = wrapper.get('audio').element as HTMLAudioElement;
+    Object.defineProperty(audio, 'duration', { configurable: true, value: 120 });
+    await wrapper.get('audio').trigger('loadedmetadata');
+
+    const slider = wrapper.get('.music-progress');
+    const input = slider.element as HTMLInputElement;
+
+    // 拖动中只更新显示，不动 audio.currentTime。
+    // 注意不能用 setValue —— 它会连带触发 change，正是这里要区分的那个事件。
+    input.value = '40';
+    await slider.trigger('input');
+
+    expect(audio.currentTime).toBe(0);
+    expect(wrapper.get('.music-progress-row').text()).toContain('0:40');
+
+    // 松手（change）才提交。
+    await slider.trigger('change');
+    expect(audio.currentTime).toBe(40);
+  });
+
+  it('shows --:-- instead of NaN when the duration is not known yet', async () => {
+    const wrapper = mount(MusicPlayer);
+    await flushPromises();
+
+    // 直播流的 duration 是 Infinity，未加载完是 NaN —— 都不能显示成 NaN:NaN。
+    const audio = wrapper.get('audio').element as HTMLAudioElement;
+    Object.defineProperty(audio, 'duration', { configurable: true, value: Number.NaN });
+    await wrapper.get('audio').trigger('loadedmetadata');
+
+    expect(wrapper.get('.music-progress-row').text()).toContain('--:--');
+    expect(wrapper.get('.music-progress').attributes('disabled')).toBeDefined();
+  });
+
+  it('persists volume and mute, and applies them to the audio element', async () => {
+    const wrapper = mount(MusicPlayer);
+    await flushPromises();
+    await wrapper.get('.music-track').trigger('click');
+    await flushPromises();
+
+    const audio = wrapper.get('audio').element as HTMLAudioElement;
+
+    await wrapper.get('.music-volume').setValue('0.35');
+    await flushPromises();
+    expect(audio.volume).toBeCloseTo(0.35);
+    expect(window.localStorage.getItem('yuer.musicPlayer')).toContain('"volume":0.35');
+
+    await wrapper.get('[aria-label="静音"]').trigger('click');
+    await flushPromises();
+    expect(audio.muted).toBe(true);
+    expect(window.localStorage.getItem('yuer.musicPlayer')).toContain('"isMuted":true');
+  });
+
+  it('ignores a corrupted stored volume instead of breaking the player', async () => {
+    // audio.volume 超出 0~1 会抛 IndexSizeError，一个坏值能让整个播放器不可用。
+    window.localStorage.setItem(
+      'yuer.musicPlayer',
+      JSON.stringify({ currentIndex: 0, expanded: true, mode: 'list', volume: 42 }),
+    );
+
+    const wrapper = mount(MusicPlayer);
+    await flushPromises();
+
+    const audio = wrapper.get('audio').element as HTMLAudioElement;
+    expect(audio.volume).toBeCloseTo(0.7);
+  });
+
+  it('highlights the lyric line matching the current playback time', async () => {
+    window.localStorage.setItem(
+      'yuer.musicPlayer',
+      JSON.stringify({ currentIndex: 0, expanded: true, mode: 'list' }),
+    );
+
+    const wrapper = mount(MusicPlayer);
+    await flushPromises();
+
+    // 两行歌词：[00:00] 第一句 / [00:10] 第二句。
+    const lines = () => wrapper.findAll('.music-lyric-line');
+    expect(lines()).toHaveLength(2);
+    expect(lines()[0].classes()).toContain('active');
+
+    const audio = wrapper.get('audio').element as HTMLAudioElement;
+    Object.defineProperty(audio, 'currentTime', { configurable: true, value: 12 });
+    await wrapper.get('audio').trigger('timeupdate');
+
+    expect(lines()[0].classes()).not.toContain('active');
+    expect(lines()[1].classes()).toContain('active');
   });
 });

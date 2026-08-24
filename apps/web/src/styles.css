@@ -1427,6 +1427,17 @@ h1 {
   width: 62%;
 }
 
+/* ============================================================
+   音乐播放器（MusicPlayer.vue）
+   毛玻璃取 .site-header 那一层的强度（blur 20px / saturate 140%），
+   与导航栏视觉同源；比 .home-card 更实，因为它悬浮在正文之上，
+   底下什么内容都可能经过，需要足够遮蔽力保证文字可读。
+
+   ⚠️ backdrop-filter 加在内层的 -main / -panel 上，不加在 .music-player 本身：
+   非 none 的 backdrop-filter 会让元素成为 fixed 后代的包含块。这里虽然没有
+   fixed 子元素、加了也不会立刻出问题，但保持和 .site-shell 同样的避让习惯
+   （见文件顶部那条注释），免得以后往里塞浮层时踩坑。
+   ============================================================ */
 .music-player {
   bottom: 24px;
   display: grid;
@@ -1440,57 +1451,83 @@ h1 {
 
 .music-player-main,
 .music-player-panel {
-  background: var(--card);
-  border: 1px solid var(--border);
+  backdrop-filter: blur(20px) saturate(140%);
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow);
 }
 
 .music-player-main {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px 8px;
+}
+
+.music-controls {
   align-items: center;
   display: grid;
   gap: 8px;
-  grid-template-columns: 44px minmax(0, 1fr) 38px 38px auto;
-  padding: 10px;
+  grid-template-columns: 40px minmax(0, 1fr) 32px 32px auto;
 }
 
 .music-icon-button,
+.music-play-button,
 .music-mode-button,
 .music-track,
 .music-playlist-item {
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  border: 1px solid transparent;
+  border-radius: 10px;
   cursor: pointer;
   transition:
+    background-color 0.2s ease,
     border-color 0.2s ease,
+    color 0.2s ease,
     transform 0.2s ease;
+}
+
+/* 播放键是主操作，用实心粉底把它和其余控件区分开。 */
+.music-play-button {
+  align-items: center;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
+  border-radius: 999px;
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 34%, transparent);
+  color: var(--on-accent);
+  display: inline-flex;
+  height: 40px;
+  justify-content: center;
+  padding: 0;
+  width: 40px;
 }
 
 .music-icon-button {
   align-items: center;
-  background: var(--bg-soft);
-  color: var(--ink);
+  background: transparent;
+  color: var(--muted);
   display: inline-flex;
-  font-size: 0;
-  height: 38px;
+  height: 32px;
   justify-content: center;
   padding: 0;
-  position: relative;
-  width: 38px;
+  width: 32px;
 }
 
-.music-icon-button::before {
-  color: var(--accent-strong);
-  content: attr(aria-label);
-  font-size: 11px;
-  font-weight: 700;
+.music-play-button svg,
+.music-icon-button svg {
+  fill: currentcolor;
+  height: 20px;
+  width: 20px;
+}
+
+.music-play-button svg {
+  height: 18px;
+  width: 18px;
 }
 
 .music-track {
   background: transparent;
-  border-color: transparent;
+  color: var(--ink);
   min-width: 0;
-  padding: 4px 0;
+  padding: 4px 2px;
   text-align: left;
 }
 
@@ -1502,11 +1539,6 @@ h1 {
   white-space: nowrap;
 }
 
-.music-track strong {
-  color: var(--ink);
-  font-size: 14px;
-}
-
 .music-track span {
   color: var(--muted);
   font-size: 12px;
@@ -1514,26 +1546,127 @@ h1 {
 }
 
 .music-mode-button {
-  background: var(--bg-soft);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
   color: var(--accent-strong);
   font-size: 12px;
   font-weight: 700;
-  height: 38px;
+  height: 30px;
   padding: 0 10px;
+}
+
+.music-error {
+  color: var(--accent-strong);
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* ——— 进度条与音量条：同一套 range 外观，靠 --fill 画已播/已选部分 ——— */
+.music-progress-row {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.music-time {
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.music-range {
+  appearance: none;
+  background: linear-gradient(
+    90deg,
+    var(--accent) 0%,
+    var(--accent) var(--fill, 0%),
+    color-mix(in srgb, var(--border) 70%, transparent) var(--fill, 0%)
+  );
+  border-radius: 999px;
+  cursor: pointer;
+  height: 4px;
+  margin: 0;
+  width: 100%;
+}
+
+.music-range:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+/* 滑块拇指：两套伪元素分别给 WebKit 和 Firefox，写法不能合并。 */
+.music-range::-webkit-slider-thumb {
+  appearance: none;
+  background: var(--surface);
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--accent) 40%, transparent);
+  height: 12px;
+  width: 12px;
+}
+
+.music-range::-moz-range-thumb {
+  background: var(--surface);
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  height: 12px;
+  width: 12px;
+}
+
+.music-volume-row {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 32px minmax(0, 1fr);
 }
 
 .music-player-panel {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   padding: 12px;
 }
 
+/* ——— 歌词：多行滚动，当前行高亮居中 ——— */
+.music-lyrics {
+  display: grid;
+  gap: 6px;
+  max-height: 108px;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+}
+
+.music-lyrics::-webkit-scrollbar {
+  display: none;
+}
+
+.music-lyric-line {
+  color: color-mix(in srgb, var(--muted) 70%, transparent);
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 0;
+  text-align: center;
+  text-wrap: pretty;
+  transition:
+    color 0.3s ease,
+    transform 0.3s ease;
+}
+
+.music-lyric-line.active {
+  color: var(--accent-strong);
+  font-weight: 700;
+  transform: scale(1.04);
+}
+
+/* 没有时间轴的歌词（纯文本或占位）沿用单段落展示。 */
 .music-lyric {
   color: var(--ink);
   font-size: 13px;
   line-height: 1.7;
   margin: 0;
   min-height: 22px;
+  text-align: center;
   text-wrap: pretty;
 }
 
@@ -1546,28 +1679,50 @@ h1 {
 
 .music-playlist-item {
   align-items: center;
-  background: var(--bg-soft);
+  background: color-mix(in srgb, var(--bg-soft) 60%, transparent);
   color: var(--ink);
   display: grid;
-  gap: 4px;
-  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+
+  /* 两列都用 minmax(0, …)：右列如果写成裸 auto，长艺术家名会按内容撑满、
+     把左边的标题挤成一两个字。这里给艺术家名一个上限，双方都能省略号截断。 */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 40%);
   min-height: 38px;
   padding: 7px 9px;
   text-align: left;
 }
 
 .music-playlist-item.active {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
   border-color: var(--accent);
 }
 
-.music-icon-button:hover,
-.music-icon-button:focus-visible,
+.music-play-button:hover,
+.music-play-button:focus-visible,
 .music-mode-button:hover,
 .music-mode-button:focus-visible,
 .music-playlist-item:hover,
 .music-playlist-item:focus-visible {
   border-color: var(--accent);
   transform: translateY(-1px);
+}
+
+.music-icon-button:hover,
+.music-icon-button:focus-visible {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent-strong);
+}
+
+.music-track:hover,
+.music-track:focus-visible {
+  color: var(--accent-strong);
+}
+
+/* strong 继承按钮的 color，不用后代选择器 —— `.music-track:hover strong` 的
+   特异性会盖住文件后面那些 `.xxx strong` 规则（stylelint no-descending-specificity）。 */
+.music-track strong {
+  color: inherit;
+  font-size: 14px;
 }
 
 .music-playlist span {
@@ -1579,6 +1734,10 @@ h1 {
 .music-playlist small {
   color: var(--muted);
   font-size: 11px;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .page-placeholder {
@@ -3327,8 +3486,20 @@ h1 {
   .home-latest-link,
   .home-message-text,
   .home-carousel-dot,
-  .heart-like-button {
+  .heart-like-button,
+  .music-play-button,
+  .music-icon-button,
+  .music-mode-button,
+  .music-track,
+  .music-playlist-item {
     transition-duration: 180ms !important;
+  }
+
+  /* 歌词当前行的高亮切换同理，否则是硬切。
+     ⚠️ .music-lyrics 的 scroll-behavior 不在这里恢复 —— 让它按全局规则降级成
+     瞬间跳转，这是 reduced-motion 下正确的行为（平滑滚动正是该设置要避免的东西）。 */
+  .music-lyric-line {
+    transition-duration: 300ms !important;
   }
 
   /* 轮播换图的淡入淡出同理（否则是硬切）。 */
