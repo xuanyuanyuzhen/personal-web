@@ -67,7 +67,9 @@ describe('EssayManageView', () => {
 
       if (url === '/api/tags/public?scope=ESSAY') {
         return Promise.resolve(
-          jsonResponse([{ color: null, id: 1, isEnabled: true, name: '日常', scopes: ['ESSAY'], slug: 'daily' }]),
+          jsonResponse([
+            { color: null, id: 1, isEnabled: true, name: '日常', scopes: ['ESSAY'], slug: 'daily' },
+          ]),
         );
       }
 
@@ -86,7 +88,10 @@ describe('EssayManageView', () => {
     });
     await flushPromises();
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/admin/essays?page=1&pageSize=10', expect.any(Object));
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/admin/essays?page=1&pageSize=10',
+      expect.any(Object),
+    );
     expect(fetchMock).toHaveBeenCalledWith('/api/admin/essay-categories', expect.any(Object));
     expect(wrapper.text()).toContain('旧随笔');
 
@@ -139,5 +144,52 @@ describe('EssayManageView', () => {
       name: '新分类',
       slug: 'new-category',
     });
+  });
+
+  it('uploads a cover file and writes the returned url into the form', async () => {
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+      if (url === '/api/admin/uploads/image' && init?.method === 'POST') {
+        return Promise.resolve(jsonResponse({ url: '/uploads/images/2026/08/cover.png' }));
+      }
+
+      if (url === '/api/tags/public?scope=ESSAY') {
+        return Promise.resolve(jsonResponse([]));
+      }
+
+      if (url === '/api/admin/essay-categories') {
+        return Promise.resolve(jsonResponse(categoriesPayload()));
+      }
+
+      return Promise.resolve(jsonResponse(essaysPayload()));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const wrapper = mount(EssayManageView, {
+      global: { plugins: [ElementPlus] },
+    });
+    await flushPromises();
+
+    const vm = wrapper.vm as unknown as {
+      essayForm: { coverUrl: string };
+      handleCoverSelected: (event: Event) => Promise<void>;
+      openCreateEssayDialog: () => void;
+    };
+    vm.openCreateEssayDialog();
+
+    // 模拟 <input type="file"> 的 change 事件。
+    const file = new File(['fake-bytes'], 'cover.png', { type: 'image/png' });
+    const input = document.createElement('input');
+    input.type = 'file';
+    Object.defineProperty(input, 'files', { value: [file] });
+    await vm.handleCoverSelected({ target: input } as unknown as Event);
+    await flushPromises();
+
+    const uploadCall = fetchMock.mock.calls.find(
+      ([url, init]) => url === '/api/admin/uploads/image' && init?.method === 'POST',
+    );
+    expect(uploadCall).toBeTruthy();
+    // 必须走 FormData，不能被序列化成 JSON —— 否则文件内容会丢。
+    expect(uploadCall?.[1]?.body).toBeInstanceOf(FormData);
+    expect(vm.essayForm.coverUrl).toBe('/uploads/images/2026/08/cover.png');
   });
 });

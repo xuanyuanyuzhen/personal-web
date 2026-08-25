@@ -316,11 +316,26 @@
               controls-position="right"
             />
           </el-form-item>
-          <el-form-item label="封面地址">
-            <el-input
-              v-model="essayForm.coverUrl"
-              placeholder="/uploads/essays/cover.png"
-            />
+          <el-form-item label="封面">
+            <div class="essay-cover-row">
+              <el-input
+                v-model="essayForm.coverUrl"
+                placeholder="/uploads/images/2026/08/cover.png"
+              />
+              <input
+                ref="coverInputRef"
+                class="visually-hidden"
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                @change="handleCoverSelected"
+              >
+              <el-button
+                :loading="uploadingCover"
+                @click="coverInputRef?.click()"
+              >
+                上传封面
+              </el-button>
+            </div>
           </el-form-item>
         </div>
         <el-form-item label="标签">
@@ -459,6 +474,7 @@ import {
   type PublishStatus,
   updateEssay,
   updateEssayCategory,
+  uploadImageFile,
   type Visibility,
 } from '../services/content';
 import { ApiError } from '../services/request';
@@ -493,6 +509,8 @@ const categorySaving = ref(false);
 const essayDialogOpen = ref(false);
 const categoryDialogOpen = ref(false);
 const errorMessage = ref('');
+const uploadingCover = ref(false);
+const coverInputRef = ref<HTMLInputElement | null>(null);
 const categoryError = ref('');
 const searchInput = ref('');
 const activeSearch = ref('');
@@ -681,6 +699,30 @@ function normalizeCategoryPayload(): EssayCategoryPayload {
   };
 }
 
+async function handleCoverSelected(event: Event) {
+  const input = event.target instanceof HTMLInputElement ? event.target : null;
+  const file = input?.files?.[0];
+  if (!file) {
+    return;
+  }
+
+  uploadingCover.value = true;
+  errorMessage.value = '';
+  try {
+    const result = await uploadImageFile(file);
+    essayForm.coverUrl = result.url;
+    ElMessage.success('封面已上传');
+  } catch (error) {
+    errorMessage.value = error instanceof ApiError ? error.message : '上传封面失败';
+  } finally {
+    uploadingCover.value = false;
+    // 清空 input，否则连续选同一个文件不会再触发 change。
+    if (input) {
+      input.value = '';
+    }
+  }
+}
+
 async function handleSubmitEssay() {
   errorMessage.value = '';
   const valid = essayFormRef.value ? await essayFormRef.value.validate() : true;
@@ -768,9 +810,20 @@ async function confirmDisableCategory(item: EssayCategoryItem) {
 defineExpose({
   categoryForm,
   essayForm,
+  handleCoverSelected,
   handleSubmitCategory,
   handleSubmitEssay,
   openCreateCategoryDialog,
   openCreateEssayDialog,
 });
 </script>
+
+<style scoped>
+.essay-cover-row {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  width: 100%;
+}
+</style>

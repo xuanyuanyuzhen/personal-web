@@ -2804,13 +2804,19 @@ h1 {
   width: 100%;
 }
 
+/* 碎碎念配图按「表情包」用：小尺寸、保持原始比例、不裁切。
+   ⚠️ 不要改回 width: 100% + aspect-ratio + object-fit: cover 那一套 ——
+   那会把方形表情包拉成 16:9 并裁掉上下，正是这次要修的问题。
+   max-width/max-height 同时限制，保证竖图也不会窜得很高。 */
 .thought-image {
-  aspect-ratio: 16 / 9;
   border-radius: 8px;
   display: block;
-  margin-bottom: 18px;
-  object-fit: cover;
-  width: 100%;
+  height: auto;
+  margin-bottom: 14px;
+  max-height: 160px;
+  max-width: 160px;
+  object-fit: contain;
+  width: auto;
 }
 
 .thought-meta {
