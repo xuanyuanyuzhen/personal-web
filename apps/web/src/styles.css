@@ -1659,13 +1659,19 @@ h1 {
   transform: scale(1.04);
 }
 
-/* 没有时间轴的歌词（纯文本或占位）沿用单段落展示。 */
+/* 没有时间轴的歌词（纯文本或占位）沿用单段落展示。
+   无歌词时兜底显示「歌名 - 歌手」，而歌名可能很长（B 站搬运的曲目常带一长串
+   说明），不限行数会占掉三四行把播放列表挤下去。最多两行，超出省略。 */
 .music-lyric {
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   color: var(--ink);
+  display: -webkit-box;
   font-size: 13px;
   line-height: 1.7;
   margin: 0;
   min-height: 22px;
+  overflow: hidden;
   text-align: center;
   text-wrap: pretty;
 }
@@ -1674,7 +1680,12 @@ h1 {
   display: grid;
   gap: 6px;
   max-height: 168px;
+
+  /* 上下留 2px：列表项 hover 时 translateY(-1px) 会把顶边推出
+     overflow 容器的可视区，1px 边框正好被裁掉。给滚动容器留出位移空间。
+     ⚠️ 改 hover 位移量的话这里要一起改，否则裁切会重现。 */
   overflow: auto;
+  padding: 2px;
 }
 
 .music-playlist-item {
@@ -1725,7 +1736,10 @@ h1 {
   font-size: 14px;
 }
 
+/* 显式设字号：不设的话会继承 body 的 16px，比上方主栏标题（14px）还大，
+   而播放列表是次要信息，层级反了。 */
 .music-playlist span {
+  font-size: 13px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
