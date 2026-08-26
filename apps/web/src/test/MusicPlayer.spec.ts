@@ -9,7 +9,23 @@ function jsonResponse(body: unknown) {
   } as Response;
 }
 
-function musicTracks() {
+type MusicTrackFixture = {
+  artist: string;
+  createdAt: string;
+  externalUrl: string | null;
+  id: number;
+  isEnabled: boolean;
+  localUrl: string | null;
+  lyricFileUrl: string | null;
+  lyricText: string | null;
+  sortOrder: number;
+  title: string;
+  updatedAt: string;
+};
+
+// 显式标注返回类型：不标的话 lyricFileUrl: null 会被推断成字面量 null 类型，
+// 用例里再赋一个字符串就报 TS2322（vue-tsc 会拦下，vite build 不会）。
+function musicTracks(): MusicTrackFixture[] {
   return [
     {
       artist: '语尔',
@@ -163,7 +179,7 @@ describe('MusicPlayer', () => {
     const slowLyrics = musicTracks();
     slowLyrics[1].lyricFileUrl = '/uploads/music/night.lrc';
 
-    let releaseLyricFetch = () => undefined;
+    let releaseLyricFetch: () => void = () => undefined;
     const pendingLyric = new Promise<string>((resolve) => {
       releaseLyricFetch = () => resolve('[00:00.00]夜色第一句');
     });
