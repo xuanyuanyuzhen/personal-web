@@ -1630,8 +1630,10 @@ h1 {
 /* ——— 歌词：多行滚动，当前行高亮居中 ——— */
 .music-lyrics {
   display: grid;
-  gap: 6px;
-  max-height: 108px;
+
+  /* 双语时每组是两行，间距比单语时需要更明确的分隔。 */
+  gap: 10px;
+  max-height: 132px;
   overflow-y: auto;
   scroll-behavior: smooth;
   scrollbar-width: none;
@@ -1641,16 +1643,28 @@ h1 {
   display: none;
 }
 
+/* 一个 .music-lyric-line 是「同一时间戳的一组」，双语歌词下含原文 + 译文两行。
+   整组一起高亮：平铺成单行的话高亮只能落在译文上，原文永远不亮。 */
 .music-lyric-line {
   color: color-mix(in srgb, var(--muted) 70%, transparent);
+  transition:
+    color 0.3s ease,
+    transform 0.3s ease;
+}
+
+.music-lyric-text {
   font-size: 13px;
   line-height: 1.6;
   margin: 0;
   text-align: center;
   text-wrap: pretty;
-  transition:
-    color 0.3s ease,
-    transform 0.3s ease;
+}
+
+/* 译文（组内第二行起）小一号、淡一点，和原文形成主次。 */
+.music-lyric-text.translation {
+  font-size: 12px;
+  margin-top: 2px;
+  opacity: 0.78;
 }
 
 .music-lyric-line.active {

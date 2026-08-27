@@ -90,12 +90,22 @@ watch(activeLyricIndex, (index) => {
     return;
   }
 
-  const line = container.children[index];
-  if (!line) {
+  const group = container.children[index];
+  if (!group) {
     return;
   }
 
-  container.scrollTop = line.offsetTop - container.clientHeight / 2 + line.clientHeight / 2;
+  // 用 getBoundingClientRect 的相对差值，而不是 group.offsetTop。
+  //
+  // ⚠️ offsetTop 是相对「最近的定位祖先」，而 .music-lyrics 没有 position，
+  // 于是基准变成了 .music-player-panel —— offsetTop 里混进了音量条等兄弟元素
+  // 的高度，scrollTop 因此算得过大，把高亮那一组的顶部（双语时是原文那行）
+  // 裁掉十几个像素。改成 rect 差值就与定位上下文无关了。
+  const containerRect = container.getBoundingClientRect();
+  const groupRect = group.getBoundingClientRect();
+  const offsetWithinView = groupRect.top - containerRect.top;
+
+  container.scrollTop += offsetWithinView - (container.clientHeight - groupRect.height) / 2;
 });
 
 function applyVolumeToAudio() {
@@ -345,24 +355,49 @@ async function loadLyrics() {
   lyricTextFallback.value = text || `${track.title} - ${track.artist}`;
 }
 
+/**
+ * 把 LRC 文本解析成按时间分组的歌词。
+ *
+ * 双语歌词（网易云等平台的常见导出格式）会给同一时刻写多行：
+ *
+ *   [00:12.00]沈むように溶けてゆくように
+ *   [00:12.00]仿佛沉溺 又仿佛消融
+ *
+ * 所以这里返回的是「时间点 → 该时刻的若干行」，而不是平铺的行数组：
+ * 平铺的话高亮只能落在其中一行（找最后一个 time <= currentTime 的下标，
+ * 必然是译文），原文永远不亮。分组后整组一起高亮、一起居中。
+ *
+ * 同一时刻多行也让 `:key` 不能再用 time —— 分组后 key 用时间、组内用下标。
+ */
 function parseLyrics(text) {
-  return text
-    .split(/\r?\n/)
-    .map((line) => {
-      const match = line.match(/^\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?]\s*(.*)$/);
-      if (!match) {
-        return null;
-      }
+  const byTime = new Map();
 
-      const minutes = Number(match[1]);
-      const seconds = Number(match[2]);
-      const fraction = Number((match[3] ?? '0').padEnd(3, '0'));
-      return {
-        text: match[4]?.trim() || '',
-        time: minutes * 60 + seconds + fraction / 1000,
-      };
-    })
-    .filter(Boolean)
+  for (const rawLine of text.split(/\r?\n/)) {
+    const match = rawLine.match(/^\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?]\s*(.*)$/);
+    if (!match) {
+      continue;
+    }
+
+    const minutes = Number(match[1]);
+    const seconds = Number(match[2]);
+    const fraction = Number((match[3] ?? '0').padEnd(3, '0'));
+    const time = minutes * 60 + seconds + fraction / 1000;
+    const lineText = match[4]?.trim() ?? '';
+
+    // 纯时间戳、没有文字的行（LRC 常用来标记间奏）不占一行位置，
+    // 但要保留这个时间点本身，否则间奏时高亮会停在上一句不动。
+    const existing = byTime.get(time);
+    if (existing) {
+      if (lineText) {
+        existing.push(lineText);
+      }
+    } else {
+      byTime.set(time, lineText ? [lineText] : []);
+    }
+  }
+
+  return [...byTime.entries()]
+    .map(([time, texts]) => ({ texts, time }))
     .sort((first, second) => first.time - second.time);
 }
 </script>
@@ -573,14 +608,27 @@ function parseLyrics(text) {
         ref="lyricsRef"
         class="music-lyrics"
       >
-        <p
-          v-for="(line, index) in lyricLines"
-          :key="line.time"
+        <div
+          v-for="(group, index) in lyricLines"
+          :key="group.time"
           class="music-lyric-line"
           :class="{ active: index === activeLyricIndex }"
         >
-          {{ line.text || '♪' }}
-        </p>
+          <p
+            v-for="(text, textIndex) in group.texts"
+            :key="textIndex"
+            class="music-lyric-text"
+            :class="{ translation: textIndex > 0 }"
+          >
+            {{ text }}
+          </p>
+          <p
+            v-if="group.texts.length === 0"
+            class="music-lyric-text"
+          >
+            ♪
+          </p>
+        </div>
       </div>
       <p
         v-else
