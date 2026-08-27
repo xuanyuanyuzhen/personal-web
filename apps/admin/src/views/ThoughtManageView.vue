@@ -42,9 +42,18 @@
       row-key="id"
     >
       <el-table-column
+        label="内容"
+        min-width="260"
+        show-overflow-tooltip
+      >
+        <template #default="{ row }">
+          {{ plainTextPreview(row.content) }}
+        </template>
+      </el-table-column>
+      <el-table-column
         prop="summary"
         label="摘要"
-        min-width="220"
+        min-width="180"
         show-overflow-tooltip
       />
       <el-table-column
@@ -207,6 +216,7 @@
         <el-form-item label="标签">
           <el-select
             v-model="form.tagNames"
+            allow-create
             default-first-option
             filterable
             multiple
@@ -378,6 +388,24 @@ function handleResetSearch() {
 function handlePageSizeChange() {
   pagination.page = 1;
   void loadData();
+}
+
+/**
+ * 把富文本正文转成表格里能显示的一行纯文本。
+ *
+ * 用 DOMParser 而不是正则剥标签：正则遇到 `<p title="a>b">` 这类属性里带尖括号的
+ * 情况会截错位置，把正文吃掉一段。DOMParser 走的是真正的 HTML 解析。
+ * 它只解析不挂载，脚本不会执行，所以这里不存在 XSS 风险。
+ */
+function plainTextPreview(html: string | null | undefined): string {
+  if (!html) {
+    return '';
+  }
+
+  const text = new DOMParser().parseFromString(html, 'text/html').body.textContent ?? '';
+
+  // 富文本常带换行和连续空白，表格里压成单行更好读。
+  return text.replace(/\s+/g, ' ').trim();
 }
 
 function resetForm(next: ThoughtForm) {

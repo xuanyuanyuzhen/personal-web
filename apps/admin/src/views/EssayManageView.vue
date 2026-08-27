@@ -341,6 +341,7 @@
         <el-form-item label="标签">
           <el-select
             v-model="essayForm.tagNames"
+            allow-create
             default-first-option
             filterable
             multiple
