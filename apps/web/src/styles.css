@@ -1391,7 +1391,11 @@ h1 {
   box-shadow: var(--shadow);
   cursor: pointer;
   display: flex;
-  height: 132px;
+
+  /* 尺寸严格按精灵图帧的 12:13（源帧 192x208）取 0.75 倍，比例不吻合会把角色拉扁。
+     改这里必须同步改 scripts/prep-mascot-sprite.py 的 BASELINE_FRAME_W，
+     让 baseline 每帧正好等于显示宽度，像素画才不会被非整数缩放糊掉。 */
+  height: 156px;
   justify-content: center;
   overflow: hidden;
   padding: 0;
@@ -1399,7 +1403,7 @@ h1 {
   transition:
     border-color 0.2s ease,
     transform 0.2s ease;
-  width: 104px;
+  width: 144px;
 }
 
 .mascot-figure-button:hover,
@@ -1408,7 +1412,23 @@ h1 {
   transform: translateY(-2px);
 }
 
-.mascot-figure-button img {
+/* 精灵图自带体积和留白，不需要卡片外框；边框保留为透明避免布局跳动 */
+.mascot-figure-button.is-sprite {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.mascot-figure-button.is-sprite:hover,
+.mascot-figure-button.is-sprite:focus-visible {
+  border-color: transparent;
+}
+
+/* ⚠️ 必须是直接子元素选择器：兜底的 <img> 是 button 的直接子元素，而精灵图的
+   <img class="sprite-mascot-sheet"> 嵌在 .sprite-mascot 里。写成 `.mascot-figure-button img`
+   会一并命中精灵图，且特异性(0,1,1)高于 .sprite-mascot-sheet(0,1,0)，
+   object-fit: contain 会把整张 sheet 缩进框里全部显示出来。 */
+.mascot-figure-button > img {
   display: block;
   height: 100%;
   object-fit: contain;
@@ -1425,6 +1445,113 @@ h1 {
   margin-bottom: 10px;
   opacity: 0.72;
   width: 62%;
+}
+
+/* 用户按键时弹出的键帽（MascotWidget.vue）。靠 :key 换元素重启入场动画，
+   animation-fill-mode: forwards 让它停在透明态，不用 JS 定时器收场。 */
+.mascot-keycap {
+  align-items: center;
+  align-self: flex-end;
+  animation: mascot-keycap-pop 900ms ease-out forwards;
+  background: color-mix(in srgb, var(--card) 92%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+  color: var(--ink);
+  display: flex;
+  font-family: ui-monospace, "Cascadia Code", consolas, monospace;
+  font-size: 13px;
+  justify-content: center;
+  min-width: 26px;
+  padding: 3px 7px;
+  pointer-events: none;
+}
+
+@keyframes mascot-keycap-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  18% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  70% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+/* 精灵图看板娘（SpriteMascot.vue）
+   视口只露出 sprite sheet 的一格；图片被放大到 cols×rows 个视口大小，
+   于是横向平移 100%/cols 正好一帧、纵向平移 100%/rows 正好一行。
+   位移用百分比（相对图片自身尺寸），所以 baseline / full 两档分辨率共用同一套数值。 */
+.sprite-mascot {
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+
+/* 水平镜像作用在视口而非 sheet 图片：图片的 transform 被逐帧位移占着，
+   在那上面叠 scaleX(-1) 会连位移方向一起取反。见 SpriteMascot.vue 的 flipX。 */
+.sprite-mascot.is-flipped {
+  transform: scaleX(-1);
+}
+
+.sprite-mascot-sheet {
+  height: calc(var(--sprite-rows) * 100%);
+
+  /* 像素画必须关掉平滑插值，否则缩放后糊成一团 */
+  image-rendering: pixelated;
+  left: 0;
+  position: absolute;
+  top: 0;
+  width: calc(var(--sprite-cols) * 100%);
+}
+
+.sprite-mascot-sheet.is-animated {
+  animation: sprite-play var(--sprite-dur) steps(var(--sprite-frames)) infinite;
+}
+
+/* 点击反应只播一遍，animationend 后组件把状态落回 idle */
+.sprite-mascot-sheet.is-once {
+  animation-iteration-count: 1;
+}
+
+/* 静止：摆到当前状态的首帧（offset 起点），不挂动画。
+   单帧状态（如定格睡姿）和 reduced-motion 下都走这条。 */
+.sprite-mascot-sheet.is-static {
+  transform: translate3d(
+    calc(var(--sprite-offset) * -100% / var(--sprite-cols)),
+    calc(var(--sprite-row) * -100% / var(--sprite-rows)),
+    0
+  );
+}
+
+@keyframes sprite-play {
+  from {
+    transform: translate3d(
+      calc(var(--sprite-offset) * -100% / var(--sprite-cols)),
+      calc(var(--sprite-row) * -100% / var(--sprite-rows)),
+      0
+    );
+  }
+
+  to {
+    transform: translate3d(
+      calc((var(--sprite-offset) + var(--sprite-frames)) * -100% / var(--sprite-cols)),
+      calc(var(--sprite-row) * -100% / var(--sprite-rows)),
+      0
+    );
+  }
 }
 
 /* ============================================================
@@ -3325,8 +3452,9 @@ h1 {
   }
 
   .mascot-figure-button {
-    height: 104px;
-    width: 82px;
+    /* 同样保持 12:13，120/130 = 0.923 */
+    height: 130px;
+    width: 120px;
   }
 
   .music-player {
@@ -3512,6 +3640,27 @@ h1 {
   .boot-rain-line {
     animation-duration: var(--dur) !important;
     animation-iteration-count: infinite !important;
+  }
+
+  /* 精灵图看板娘：开发期（SpriteMascot.vue 的 respectsReducedMotion() 为 false）
+     照常逐帧播放，否则本机系统关了动画效果就永远看不到它动，帧数和帧率没法调。
+     必须显式恢复时长与循环 —— steps() 动画被压成 0.001ms 不是「变快」而是
+     「瞬间闪完所有帧停在最后一帧」，看起来像坏了。
+     生产期组件挂 .is-static 而非 .is-animated，本块自然不生效。 */
+  .sprite-mascot-sheet.is-animated {
+    animation-duration: var(--sprite-dur) !important;
+    animation-iteration-count: infinite !important;
+  }
+
+  .sprite-mascot-sheet.is-animated.is-once {
+    animation-iteration-count: 1 !important;
+  }
+
+  /* 键帽显示的是「你刚按了什么」这条信息，不是装饰动画。被全局规则压成 0.001ms
+     等于一闪而过完全读不到，所以时长必须恢复。位移和淡入淡出留着无妨，
+     它本来就只有几像素。 */
+  .mascot-keycap {
+    animation-duration: 900ms !important;
   }
 
   /* 首页卡片的 hover 抬升是用户点名要保留的微交互：本机 Windows 关了「动画效果」，

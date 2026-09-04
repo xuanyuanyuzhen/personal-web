@@ -70,14 +70,52 @@
             </el-checkbox-group>
           </el-form-item>
 
-          <el-form-item label="Live2D 预留配置">
-            <el-input
-              v-model="live2dText"
-              type="textarea"
-              :rows="4"
-              resize="vertical"
+          <el-form-item label="精灵图看板娘">
+            <el-switch
+              v-model="configForm.modelEnabled"
+              active-text="启用"
+              inactive-text="禁用"
             />
           </el-form-item>
+
+          <template v-if="configForm.modelEnabled">
+            <el-form-item label="精灵图路径">
+              <el-input
+                v-model="configForm.spriteUrl"
+                placeholder="/mascot/pets/elysia/sprite.webp"
+              />
+            </el-form-item>
+            <el-form-item label="高清图路径（可选）">
+              <el-input
+                v-model="configForm.spriteUrlFull"
+                placeholder="/mascot/pets/elysia/sprite-full.webp"
+              />
+              <div class="form-hint">
+                填了就会在前台显示后台默默升级；网络差或开了省流量时自动跳过。
+              </div>
+            </el-form-item>
+            <el-form-item label="水平翻转">
+              <el-switch
+                v-model="configForm.spriteFlipX"
+                active-text="镜像"
+                inactive-text="原向"
+              />
+            </el-form-item>
+            <el-form-item label="网格与状态（JSON）">
+              <el-input
+                v-model="modelExtrasText"
+                type="textarea"
+                :rows="6"
+                resize="vertical"
+                :placeholder="MODEL_EXTRAS_EXAMPLE"
+              />
+              <div class="form-hint">
+                每个状态是「取哪一行、从第几帧起、播几帧、每秒几帧」。frames 填 1 就是定格不动，
+                填多了会闪出空白格。状态名固定：stand（站立，默认）、gestureA / gestureB（站久了
+                随机插播一个，播完回站立）、typing（聚焦输入框时）、sleep（久无操作）、react（点击）。
+              </div>
+            </el-form-item>
+          </template>
 
           <div class="form-actions">
             <el-button
@@ -286,7 +324,10 @@ const scopeOptions = [
   { label: '自定义页面', value: 'custom-page' },
   { label: '搜索', value: 'search' },
 ];
-const linePageOptions = [{ label: '通用', value: '*' }, ...scopeOptions.filter((item) => item.value !== '*')];
+const linePageOptions = [
+  { label: '通用', value: '*' },
+  ...scopeOptions.filter((item) => item.value !== '*'),
+];
 
 const activeTab = ref('config');
 const loading = ref(false);
@@ -295,7 +336,15 @@ const savingConfig = ref(false);
 const savingLine = ref(false);
 const uploading = ref(false);
 const errorMessage = ref('');
-const live2dText = ref('{"reserved":true}');
+// 写成常量而非模板里的字面量：JSON 含双引号，直接写进 placeholder 属性
+// 只能用单引号包裹，会触发 vue/html-quotes。
+// offset 用于「只取该行某一帧」——站立和睡姿都是定格单帧。
+const MODEL_EXTRAS_EXAMPLE =
+  '{"cols":8,"rows":5,"states":{"stand":{"row":0,"frames":1},"gestureA":{"row":0,"frames":6,"fps":6},' +
+  '"gestureB":{"row":1,"frames":6,"fps":6},"react":{"row":2,"frames":4,"fps":6},' +
+  '"sleep":{"row":3,"offset":4,"frames":1},"typing":{"row":4,"frames":6,"fps":12}}}';
+
+const modelExtrasText = ref('');
 const lines = ref<MascotLine[]>([]);
 const configFormRef = ref();
 const lineFormRef = ref();
@@ -305,7 +354,11 @@ const configForm = reactive({
   displayScopes: ['*'] as string[],
   imageUrl: '',
   isEnabled: true,
+  modelEnabled: false,
   name: '',
+  spriteFlipX: false,
+  spriteUrl: '',
+  spriteUrlFull: '',
 });
 
 const lineForm = reactive({
@@ -355,7 +408,7 @@ async function loadConfig() {
       isEnabled: config.isEnabled,
       name: config.name,
     });
-    live2dText.value = JSON.stringify(config.live2dConfig ?? { reserved: true }, null, 2);
+    applyModelConfig(config.modelConfig);
   } catch (error) {
     errorMessage.value = error instanceof ApiError ? error.message : '加载看板娘配置失败';
   } finally {
@@ -375,6 +428,38 @@ async function loadLines() {
   }
 }
 
+function applyModelConfig(raw: unknown) {
+  const modelConfig =
+    raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : null;
+  const enabled = Boolean(
+    modelConfig &&
+    modelConfig.renderer === 'sprite' &&
+    typeof modelConfig.spriteUrl === 'string' &&
+    modelConfig.spriteUrl,
+  );
+
+  configForm.modelEnabled = enabled;
+  configForm.spriteUrl = enabled ? String(modelConfig?.spriteUrl) : '';
+  configForm.spriteUrlFull =
+    enabled && typeof modelConfig?.spriteUrlFull === 'string'
+      ? String(modelConfig.spriteUrlFull)
+      : '';
+  configForm.spriteFlipX = enabled && modelConfig?.flipX === true;
+
+  if (!modelConfig) {
+    modelExtrasText.value = '';
+    return;
+  }
+
+  // 有独立输入框的字段不重复进 JSON 框，避免同一个值两处可改、保存时打架。
+  const extras: Record<string, unknown> = { ...modelConfig };
+  delete extras.renderer;
+  delete extras.spriteUrl;
+  delete extras.spriteUrlFull;
+  delete extras.flipX;
+  modelExtrasText.value = Object.keys(extras).length > 0 ? JSON.stringify(extras, null, 2) : '';
+}
+
 async function handleSaveConfig() {
   errorMessage.value = '';
   const valid = configFormRef.value ? await configFormRef.value.validate() : true;
@@ -382,12 +467,46 @@ async function handleSaveConfig() {
     return;
   }
 
-  let live2dConfig: Record<string, unknown> | null = null;
-  try {
-    live2dConfig = JSON.parse(live2dText.value || '{"reserved":true}') as Record<string, unknown>;
-  } catch {
-    errorMessage.value = 'Live2D 预留配置必须是合法 JSON';
-    return;
+  let modelConfig: Record<string, unknown> | null = null;
+  if (configForm.modelEnabled) {
+    const spriteUrl = configForm.spriteUrl.trim();
+    if (!spriteUrl) {
+      errorMessage.value = '启用精灵图时必须填写精灵图路径';
+      return;
+    }
+
+    const spriteUrlFull = configForm.spriteUrlFull.trim();
+    // 有独立控件的字段单独收拢：JSON 合并后要再覆盖一次，
+    // 否则 JSON 框里手写同名字段会把控件上的值盖掉。
+    const ownFields: Record<string, unknown> = {
+      flipX: configForm.spriteFlipX,
+      renderer: 'sprite',
+      spriteUrl,
+    };
+
+    modelConfig = { ...ownFields };
+
+    if (modelExtrasText.value.trim()) {
+      try {
+        const extras = JSON.parse(modelExtrasText.value) as unknown;
+        if (!extras || typeof extras !== 'object' || Array.isArray(extras)) {
+          errorMessage.value = '网格与状态必须是 JSON 对象';
+          return;
+        }
+
+        modelConfig = { ...(extras as Record<string, unknown>), ...ownFields };
+      } catch {
+        errorMessage.value = '网格与状态必须是合法 JSON';
+        return;
+      }
+    }
+
+    // 高清档留空表示不启用，该字段就不该出现在配置里
+    if (spriteUrlFull) {
+      modelConfig.spriteUrlFull = spriteUrlFull;
+    } else {
+      delete modelConfig.spriteUrlFull;
+    }
   }
 
   savingConfig.value = true;
@@ -396,7 +515,7 @@ async function handleSaveConfig() {
       displayScopes: configForm.displayScopes,
       imageUrl: configForm.imageUrl || null,
       isEnabled: configForm.isEnabled,
-      live2dConfig,
+      modelConfig,
       name: configForm.name,
     });
     Object.assign(configForm, {
@@ -405,6 +524,7 @@ async function handleSaveConfig() {
       isEnabled: config.isEnabled,
       name: config.name,
     });
+    applyModelConfig(config.modelConfig);
     ElMessage.success('看板娘配置已保存');
   } catch (error) {
     errorMessage.value = error instanceof ApiError ? error.message : '保存看板娘配置失败';
@@ -540,5 +660,14 @@ defineExpose({
 
 .three-columns {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.form-hint {
+  color: #8a94a6;
+  font-size: 12px;
+  line-height: 1.6;
+
+  /* el-form-item 的输入控件是行内块，提示另起一行 */
+  width: 100%;
 }
 </style>

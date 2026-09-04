@@ -22,3 +22,6 @@ yarn-debug.log*
 
 .DS_Store
 Thumbs.db
+
+# 看板娘精灵图分行预览（scripts/prep-mascot-sprite.py measure 的产物）
+tmp-sprite-preview/

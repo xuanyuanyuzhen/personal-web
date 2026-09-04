@@ -2,17 +2,40 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useI18n } from '../composables/useI18n';
+import { useMascotActivity } from '../composables/useMascotActivity';
 import { publicApi } from '../services/api';
+import SpriteMascot from './SpriteMascot.vue';
 
 const route = useRoute();
 const { locale, t } = useI18n();
+const { activity, idleGesture, lastKeystroke } = useMascotActivity();
 const mascot = ref(null);
 const activeLine = ref('');
 const imageFailed = ref(false);
+const spriteFailed = ref(false);
+const spriteRef = ref(null);
 let requestSequence = 0;
 
 const pageKey = computed(() => resolvePageKey(route.name));
 const visible = computed(() => Boolean(mascot.value));
+const spriteConfig = computed(() => {
+  const modelConfig = mascot.value?.modelConfig;
+  if (!modelConfig || typeof modelConfig !== 'object') {
+    return null;
+  }
+  if (
+    modelConfig.renderer !== 'sprite' ||
+    typeof modelConfig.spriteUrl !== 'string' ||
+    !modelConfig.spriteUrl
+  ) {
+    return null;
+  }
+  if (spriteFailed.value) {
+    return null;
+  }
+
+  return modelConfig;
+});
 
 onMounted(loadMascot);
 
@@ -36,6 +59,9 @@ async function loadMascot() {
     }
 
     mascot.value = isValidMascot(nextMascot) ? nextMascot : null;
+    // 图片失败是每次请求重置的：换了 imageUrl 就该重试一次。
+    // spriteFailed 刻意不重置 —— 精灵图加载失败通常是资源本身有问题（404、格式错），
+    // 每次切路由都重试只会反复拉同一张失败的图，回退到 imageUrl 更稳。
     imageFailed.value = false;
     updateActiveLine();
   } catch {
@@ -46,6 +72,11 @@ async function loadMascot() {
     mascot.value = null;
     activeLine.value = '';
   }
+}
+
+function handleFigureClick() {
+  showRandomLine();
+  spriteRef.value?.react();
 }
 
 function showRandomLine() {
@@ -120,14 +151,32 @@ function isValidMascot(value) {
     <div class="mascot-bubble">
       {{ activeLine }}
     </div>
+    <!-- 键帽只在有精灵图时出现：兜底静态图没有「打字」这个状态，单弹键帽会很突兀 -->
+    <div
+      v-if="spriteConfig && lastKeystroke"
+      :key="lastKeystroke.id"
+      class="mascot-keycap"
+      aria-hidden="true"
+    >
+      {{ lastKeystroke.label }}
+    </div>
     <button
       class="mascot-figure-button"
+      :class="{ 'is-sprite': Boolean(spriteConfig) }"
       type="button"
       :aria-label="t('mascot.label')"
-      @click="showRandomLine"
+      @click="handleFigureClick"
     >
+      <SpriteMascot
+        v-if="spriteConfig"
+        ref="spriteRef"
+        :config="spriteConfig"
+        :state="activity"
+        :gesture="idleGesture"
+        @error="spriteFailed = true"
+      />
       <img
-        v-if="mascot?.imageUrl && !imageFailed"
+        v-else-if="mascot?.imageUrl && !imageFailed"
         :src="mascot.imageUrl"
         :alt="mascot.name"
         @error="imageFailed = true"

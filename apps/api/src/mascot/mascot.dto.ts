@@ -15,8 +15,10 @@ export class UpdateMascotConfigDto {
   @ApiPropertyOptional({ example: ['*'] })
   displayScopes?: string[];
 
-  @ApiPropertyOptional({ example: { reserved: true } })
-  live2dConfig?: Record<string, unknown> | null;
+  @ApiPropertyOptional({
+    example: { renderer: 'sprite', spriteUrl: '/mascot/pets/elysia/sprite.webp' },
+  })
+  modelConfig?: Record<string, unknown> | null;
 
   @ApiPropertyOptional({ example: true })
   isEnabled?: boolean;

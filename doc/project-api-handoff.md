@@ -184,7 +184,7 @@ pnpm dev
 
 - `GET /mascot/public`：前台按 `pageKey` 读取看板娘配置、页面固定台词和随机台词。
 - `GET /admin/mascot/config`：后台读取看板娘配置。
-- `PUT /admin/mascot/config`：后台更新看板娘名称、图片、展示范围、Live2D 配置和启用状态。
+- `PUT /admin/mascot/config`：后台更新看板娘名称、图片、展示范围、精灵图配置和启用状态。
 - `GET /admin/mascot/lines`：后台读取页面台词和随机台词。
 - `POST /admin/mascot/lines`：后台创建台词。
 - `PUT /admin/mascot/lines/:id`：后台更新台词。

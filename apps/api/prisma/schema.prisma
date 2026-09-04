@@ -433,7 +433,7 @@ model Mascot {
   name          String   @db.VarChar(80)
   imageUrl      String?  @db.VarChar(500)
   displayScopes Json?
-  live2dConfig  Json?
+  modelConfig   Json?    @map("live2dConfig")
   isEnabled     Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

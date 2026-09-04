@@ -193,7 +193,7 @@
 | ------ | ----------------------------- | ---- | ------------------------------------------------------------- |
 | GET    | `/api/mascot/public`          | 否   | 按 `pageKey` 获取前台看板娘配置、页面台词和随机台词池。       |
 | GET    | `/api/admin/mascot/config`    | 是   | 获取后台看板娘配置。                                          |
-| PUT    | `/api/admin/mascot/config`    | 是   | 更新看板娘名称、图片、显示范围、Live2D 预留配置、启用状态。   |
+| PUT    | `/api/admin/mascot/config`    | 是   | 更新看板娘名称、图片、显示范围、精灵图配置、启用状态。        |
 | GET    | `/api/admin/mascot/lines`     | 是   | 获取看板娘页面台词和随机台词。                                |
 | POST   | `/api/admin/mascot/lines`     | 是   | 创建台词，支持页面标识、权重、随机/页面台词、排序、启用状态。 |
 | PUT    | `/api/admin/mascot/lines/:id` | 是   | 更新台词。                                                    |

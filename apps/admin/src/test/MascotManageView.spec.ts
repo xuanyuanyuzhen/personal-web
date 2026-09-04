@@ -19,7 +19,13 @@ function mascotConfig() {
     imageUrl: '/uploads/site/mascot/placeholder.png',
     isEnabled: true,
     key: 'default',
-    live2dConfig: { reserved: true },
+    modelConfig: {
+      cols: 8,
+      renderer: 'sprite',
+      rows: 2,
+      spriteUrl: '/mascot/pets/elysia/sprite.webp',
+      states: { idle: { fps: 6, frames: 6, row: 0 } },
+    },
     name: '默认看板娘',
   };
 }

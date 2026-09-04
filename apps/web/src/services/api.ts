@@ -178,6 +178,7 @@ export type PublicMascotConfig = {
   id: number;
   name: string;
   imageUrl: string | null;
+  modelConfig: Record<string, unknown> | null;
   pageKey: string;
   pageLine: PublicMascotLine | null;
   randomLines: PublicMascotLine[];
@@ -248,7 +249,8 @@ export const publicApi = {
   getEssayCategories: () => apiRequest<PublicEssayCategory[]>('/essays/categories/public'),
   getPhotoAlbums: () => apiRequest<PublicAlbum[]>('/albums/public'),
   getNavigation: () => apiRequest<ApiNavigationItem[]>('/navigations/public'),
-  getPageBySlug: (slug: string) => apiRequest<PublicPage>(`/pages/public/${encodeURIComponent(slug)}`),
+  getPageBySlug: (slug: string) =>
+    apiRequest<PublicPage>(`/pages/public/${encodeURIComponent(slug)}`),
   getMascot: (pageKey: string) =>
     apiRequest<PublicMascotConfig | null>(`/mascot/public?pageKey=${encodeURIComponent(pageKey)}`),
   getMusic: () => apiRequest<PublicMusicTrack[]>('/music/public'),

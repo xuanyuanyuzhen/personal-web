@@ -23,7 +23,7 @@ type MascotConfigView = {
   name: string;
   imageUrl: string | null;
   displayScopes: string[];
-  live2dConfig: Prisma.JsonValue;
+  modelConfig: Prisma.JsonValue;
   isEnabled: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -52,10 +52,13 @@ export class MascotService {
   ): Promise<MascotConfigView> {
     const current = await this.ensureDefaultMascot();
     const name = dto.name === undefined ? current.name : normalizeRequiredString(dto.name, 'name');
-    const imageUrl = dto.imageUrl === undefined ? current.imageUrl : normalizeNullableString(dto.imageUrl);
+    const imageUrl =
+      dto.imageUrl === undefined ? current.imageUrl : normalizeNullableString(dto.imageUrl);
     const displayScopes =
-      dto.displayScopes === undefined ? normalizeDisplayScopes(current.displayScopes) : normalizeDisplayScopes(dto.displayScopes);
-    const live2dConfig = dto.live2dConfig === undefined ? current.live2dConfig : dto.live2dConfig;
+      dto.displayScopes === undefined
+        ? normalizeDisplayScopes(current.displayScopes)
+        : normalizeDisplayScopes(dto.displayScopes);
+    const modelConfig = dto.modelConfig === undefined ? current.modelConfig : dto.modelConfig;
     const isEnabled = dto.isEnabled ?? current.isEnabled;
 
     const mascot = await this.prisma.mascot.update({
@@ -64,7 +67,7 @@ export class MascotService {
         displayScopes,
         imageUrl,
         isEnabled,
-        live2dConfig: (live2dConfig ?? { reserved: true }) as Prisma.InputJsonValue,
+        modelConfig: (modelConfig ?? Prisma.DbNull) as Prisma.InputJsonValue,
         name,
       },
     });
@@ -141,11 +144,13 @@ export class MascotService {
     const line = await this.prisma.mascotLine.update({
       where: { id },
       data: {
-        content: dto.content === undefined ? undefined : normalizeRequiredString(dto.content, 'content'),
+        content:
+          dto.content === undefined ? undefined : normalizeRequiredString(dto.content, 'content'),
         isEnabled: dto.isEnabled,
         isRandom: dto.isRandom,
         pageKey: dto.pageKey === undefined ? undefined : normalizePageKey(dto.pageKey),
-        sortOrder: dto.sortOrder === undefined ? undefined : normalizeInteger(dto.sortOrder, 0, 'sortOrder'),
+        sortOrder:
+          dto.sortOrder === undefined ? undefined : normalizeInteger(dto.sortOrder, 0, 'sortOrder'),
         weight: dto.weight === undefined ? undefined : normalizeInteger(dto.weight, 1, 'weight', 1),
       },
     });
@@ -190,6 +195,7 @@ export class MascotService {
     id: number;
     name: string;
     imageUrl: string | null;
+    modelConfig: Prisma.JsonValue;
     pageKey: string;
     pageLine: MascotLineView | null;
     randomLines: MascotLineView[];
@@ -214,7 +220,11 @@ export class MascotService {
           isRandom: false,
           pageKey: { in: [pageKey, '*'] },
         },
-        orderBy: [{ pageKey: pageKey === '*' ? 'asc' : 'desc' }, { sortOrder: 'asc' }, { id: 'asc' }],
+        orderBy: [
+          { pageKey: pageKey === '*' ? 'asc' : 'desc' },
+          { sortOrder: 'asc' },
+          { id: 'asc' },
+        ],
       }),
       this.prisma.mascotLine.findMany({
         where: {
@@ -230,6 +240,7 @@ export class MascotService {
     return {
       id: mascot.id,
       imageUrl: mascot.imageUrl,
+      modelConfig: mascot.modelConfig,
       name: mascot.name,
       pageKey,
       pageLine: pageLine ? toMascotLineView(pageLine) : null,
@@ -246,7 +257,6 @@ export class MascotService {
         imageUrl: '/uploads/site/mascot/placeholder.png',
         isEnabled: true,
         key: DEFAULT_MASCOT_KEY,
-        live2dConfig: { reserved: true },
         name: '默认看板娘',
       },
     });
@@ -273,7 +283,7 @@ function toMascotConfigView(mascot: Mascot): MascotConfigView {
     imageUrl: mascot.imageUrl,
     isEnabled: mascot.isEnabled,
     key: mascot.key,
-    live2dConfig: mascot.live2dConfig,
+    modelConfig: mascot.modelConfig,
     name: mascot.name,
     updatedAt: mascot.updatedAt,
   };
@@ -342,7 +352,12 @@ function normalizeKey(value: string | undefined): string {
   return `line-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function normalizeInteger(value: number | undefined, fallback: number, field: string, min?: number): number {
+function normalizeInteger(
+  value: number | undefined,
+  fallback: number,
+  field: string,
+  min?: number,
+): number {
   const numericValue = value ?? fallback;
   if (!Number.isInteger(numericValue) || (min !== undefined && numericValue < min)) {
     throw new BadRequestException(`${field} is invalid.`);

@@ -771,7 +771,7 @@ PrismaModule
 - `tags`：标签名、适用范围、启用状态。
 - `tag_relations`：标签与内容对象关联。
 - `musics`：歌曲名、歌手、本地文件、外部链接、歌词文本、歌词文件、排序、启用状态、软删除。
-- `mascots`：图片、显示范围、Live2D 预留配置、启用状态。
+- `mascots`：图片、显示范围、精灵图配置（`modelConfig`，列名仍为 `live2dConfig`）、启用状态。
 - `mascot_lines`：页面标识、台词内容、权重、启用状态。
 - `settings`：配置 key、配置 value、配置分组。
 - `announcements`：公告内容、启用状态、更新时间。

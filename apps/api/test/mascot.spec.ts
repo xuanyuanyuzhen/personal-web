@@ -66,14 +66,20 @@ describe('MascotService', () => {
       id: 1,
       imageUrl: '/mascot.png',
       isEnabled: true,
+      modelConfig: { modelUrl: '/mmd/hero.pmx', renderer: 'mmd' },
       name: '默认看板娘',
     });
-    prisma.mascotLine.findFirst.mockResolvedValue(makeLine({ content: '首页台词', id: 1, isRandom: false }));
-    prisma.mascotLine.findMany.mockResolvedValue([makeLine({ content: '随机台词', id: 2, isRandom: true })]);
+    prisma.mascotLine.findFirst.mockResolvedValue(
+      makeLine({ content: '首页台词', id: 1, isRandom: false }),
+    );
+    prisma.mascotLine.findMany.mockResolvedValue([
+      makeLine({ content: '随机台词', id: 2, isRandom: true }),
+    ]);
 
     const result = await service.getPublicConfig('home');
 
     expect(result?.pageKey).toBe('home');
+    expect(result?.modelConfig).toEqual({ modelUrl: '/mmd/hero.pmx', renderer: 'mmd' });
     expect(result?.pageLine?.content).toBe('首页台词');
     expect(result?.randomLines).toHaveLength(1);
     expect(prisma.mascotLine.findMany).toHaveBeenCalledWith(
@@ -120,7 +126,9 @@ describe('MascotService', () => {
 
   it('creates page and random lines with operation logs', async () => {
     prisma.mascot.upsert.mockResolvedValue(makeMascot());
-    prisma.mascotLine.create.mockResolvedValue(makeLine({ content: '新台词', id: 3, isRandom: true }));
+    prisma.mascotLine.create.mockResolvedValue(
+      makeLine({ content: '新台词', id: 3, isRandom: true }),
+    );
 
     const result = await service.createAdminLine(
       {
@@ -159,7 +167,7 @@ function makeMascot(overrides: Record<string, unknown> = {}) {
     imageUrl: '/uploads/site/mascot/placeholder.png',
     isEnabled: true,
     key: 'default',
-    live2dConfig: { reserved: true },
+    modelConfig: null,
     name: '默认看板娘',
     updatedAt: new Date(),
     ...overrides,

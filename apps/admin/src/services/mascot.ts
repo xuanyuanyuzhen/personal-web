@@ -6,7 +6,7 @@ export interface MascotConfig {
   name: string;
   imageUrl: string | null;
   displayScopes: string[];
-  live2dConfig: unknown;
+  modelConfig: unknown;
   isEnabled: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -16,7 +16,7 @@ export interface MascotConfigPayload {
   name: string;
   imageUrl: string | null;
   displayScopes: string[];
-  live2dConfig: Record<string, unknown> | null;
+  modelConfig: Record<string, unknown> | null;
   isEnabled: boolean;
 }
 
